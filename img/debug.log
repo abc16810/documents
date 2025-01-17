@@ -1,0 +1,4 @@
+[0531/170559:INFO:exception_record.cc(518)] [QB]Process ID: 5980 Type: 2
+[0531/170633:INFO:exception_record.cc(518)] [QB]Process ID: 13300 Type: 2
+[0531/170633:WARNING:url_request_job_manager.cc(89)] Failed to map: weixin://resourceid/blank
+[0531/181118:ERROR:browser_gpu_channel_host_factory.cc(119)] Failed to launch GPU process.
