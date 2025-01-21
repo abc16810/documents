@@ -1,6 +1,7 @@
 # 任务输入：一系列手写数字图片，其中每张图片都是28x28的像素矩阵
 # 任务输出：经过了大小归一化和居中处理，输出对应的0~9的数字标签
 # 50000个训练样本，10000个测试样本
+# https://aistudio.baidu.com/projectdetail/8772620
 
 #######
 # MNIST数据集是从NIST的Special Database 3（SD-3）和Special Database 1（SD-1）构建而来。Yann LeCun等人从SD-1和SD-3中各取一半数据作为MNIST训练集和测试集，其中训练集来自250位不同的标注员，且训练集和测试集的标注员完全不同。
