@@ -188,6 +188,165 @@ W_{out} = \frac{100 + 2 - 3}{2} + 1 = 50
 
 ![](./imgs/60760d68001c40d6a6c500b17f57d8deae7b5921631b4b6b896b057b904d24b1.jpg)
 
+#### 卷积算子应用举例
+
+**案例1——简单的黑白边界检测**
+
+下面是使用Conv2D算子完成一个图像边界检测的任务。图像左边为光亮部分，右边为黑暗部分，需要检测出光亮跟黑暗的分界处。
+
+设置宽度方向的卷积核为[1,0,−1]，此卷积核会将宽度方向间隔为1的两个像素点的数值相减。当卷积核在图片上滑动时，如果它所覆盖的像素点位于亮度相同的区域，则左右间隔为1的两个像素点数值的差为0。只有当卷积核覆盖的像素点有的处于光亮区域，有的处在黑暗区域时，左右间隔为1的两个点像素值的差才不为0。将此卷积核作用到图片上，输出特征图上只有对应黑白分界线的地方像素值才不为0。具体代码如下所示，结果输出在下方的图案中。
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+import paddle
+from paddle.nn import Conv2D
+from paddle.nn.initializer import Assign
+
+# 创建初始化权重参数w
+w = np.array([1, 0, -1], dtype='float32')
+# 将权重参数调整成维度为[cout, cin, kh, kw]的四维张量
+w = w.reshape([1, 1, 1, 3])
+# 创建卷积算子，设置输出通道数，卷积核大小，和初始化权重参数
+# kernel_size = [1, 3]表示kh = 1, kw=3
+# 创建卷积算子的时候，通过参数属性weight_attr指定参数初始化方式
+# 这里的初始化方式时，从numpy.ndarray初始化卷积参数
+conv = Conv2D(in_channels=1, out_channels=1, kernel_size=[1, 3],
+       weight_attr=paddle.ParamAttr(
+          initializer=Assign(value=w)))
+
+
+# 创建输入图片，图片左边的像素点取值为1，右边的像素点取值为0
+img = np.ones([50,50], dtype='float32')
+img[:, 30:] = 0.
+
+# 将图片形状调整为[N, C, H, W]的形式
+x = img.reshape([1,1,50,50])
+
+# 将numpy.ndarray转化成paddle中的tensor
+x = paddle.to_tensor(x)
+
+# 使用卷积算子作用在输入图片上
+y = conv(x)
+
+# 将输出tensor转化为numpy.ndarray
+out = y.numpy()
+
+print(out)
+
+
+f = plt.subplot(121)
+f.set_title('input image', fontsize=15)
+plt.imshow(img, cmap='gray')
+f = plt.subplot(122)
+f.set_title('output featuremap', fontsize=15)
+# 卷积算子Conv2D输出数据形状为[N, C, H, W]形式
+# 此处N, C=1，输出数据形状为[1, 1, H, W]，是4维数组
+# 但是画图函数plt.imshow画灰度图时，只接受2维数组
+# 通过numpy.squeeze函数将大小为1的维度消除
+plt.imshow(out.squeeze(), cmap='gray')
+plt.show()
+```
+![](./imgs/conv2_test.png)
+
+```
+# 查看卷积层的权重参数名字和数值
+print(conv.weight)
+# 参看卷积层的偏置参数名字和数值
+print(conv.bias)
+```
+
+**案例2——图像中物体边缘检测**
+
+上面展示的是一个人为构造出来的简单图片，使用卷积网络检测图片明暗分界处的示例。对于真实的图片，也可以使用合适的卷积核(3*3卷积核的中间值是8，周围一圈的值是8个-1)对其进行操作，用来检测物体的外形轮廓，观察输出特征图跟原图之间的对应关系，如下代码所示：
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+import paddle
+from paddle.nn import Conv2D
+from paddle.nn.initializer import Assign
+from PIL import Image
+
+img = Image.open('./tests/imgs/20250206104719.png')
+
+# 设置卷积核参数
+w = np.array([[-1,-1,-1], [-1,8,-1], [-1,-1,-1]], dtype='float32')
+w = w.reshape([1, 1, 3, 3])
+# 由于输入通道数是3，将卷积核的形状从[1,1,3,3]调整为[1,3,3,3]
+w = np.repeat(w, 3, axis=1)
+# 创建卷积算子，输出通道数为1，卷积核大小为3x3，
+# 并使用上面的设置好的数值作为卷积核权重的初始化参数
+conv = Conv2D(in_channels=3, out_channels=1, kernel_size=[3, 3], 
+            weight_attr=paddle.ParamAttr(
+              initializer=Assign(value=w)))
+
+# 将读入的图片转化为float32类型的numpy.ndarray
+x = np.array(img).astype('float32')
+# 图片读入成ndarry时，形状是[H, W, 3]，
+# 将通道这一维度调整到最前面
+x = np.transpose(x, (2,0,1))
+
+# 将数据形状调整为[N, C, H, W]格式
+x = x.reshape(1, 3, img.height, img.width)
+x = paddle.to_tensor(x)
+y = conv(x)
+out = y.numpy()
+
+plt.figure(figsize=(20, 10))
+f = plt.subplot(121)
+f.set_title('input image', fontsize=15)
+plt.imshow(img)
+f = plt.subplot(122)
+f.set_title('output feature map', fontsize=15)
+plt.imshow(out.squeeze(), cmap='gray')
+plt.show()
+```
+![](./imgs/conv_test2.png)
+
+**案例3——图像均值模糊**
+
+另外一种比较常见的卷积核（5*5的卷积核中每个值均为1）是用当前像素跟它邻域内的像素取平均，这样可以使图像上噪声比较大的点变得更平滑，如下代码所示
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+import paddle
+from paddle.nn import Conv2D
+from paddle.nn.initializer import Assign
+from PIL import Image
+
+# 读入图片并转成numpy.ndarray
+# 换成灰度图
+img = Image.open('./tests/imgs/20250206110105.png').convert('L')
+img = np.array(img)
+
+# 创建初始化参数
+w = np.ones([1, 1, 5, 5], dtype = 'float32')
+
+conv = Conv2D(in_channels=1, out_channels=1, kernel_size=[5, 5], 
+        weight_attr=paddle.ParamAttr(
+         initializer=Assign(value=w)))
+
+x = img.astype('float32')
+x = x.reshape(1,1,img.shape[0], img.shape[1])
+x = paddle.to_tensor(x)
+y = conv(x)
+out = y.numpy()
+
+plt.figure(figsize=(20, 12))
+f = plt.subplot(121)
+f.set_title('input image')
+plt.imshow(img, cmap='gray')
+
+f = plt.subplot(122)
+f.set_title('output feature map')
+out = out.squeeze()
+plt.imshow(out, cmap='gray')
+
+plt.show()
+```
+![](./imgs/conv_test3.png)
 
 #### 激活层
 
