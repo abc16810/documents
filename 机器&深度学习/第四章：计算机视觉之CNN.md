@@ -490,12 +490,15 @@ x^{(1)} = (1,2), \ \ x^{(2)} = (3,6), \ \ x^{(3)} = (5,10)
 ```math
 \hat{x}^{(1)} = (\frac{1 - 3}{\sqrt{\frac{8}{3}}}, \ \ \frac{2 - 6}{\sqrt{\frac{32}{3}}}) = (-\sqrt{\frac{3}{2}}, \ \ -\sqrt{\frac{3}{2}})
 ```
+
 ```math
-\hat{x}^{(2)} = (\frac{3 - 3}{\sqrt{\frac{8}{3}}}, \ \ \frac{6 - 6}{\sqrt{\frac{32}{3}}}) = (0, \ \ 0) \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ 
+\hat{x}^{(2)} = (\frac{3 - 3}{\sqrt{\frac{8}{3}}}, \ \ \frac{6 - 6}{\sqrt{\frac{32}{3}}}) = (0, \ \ 0) 
 ```
+
 ```math
-\hat{x}^{(3)} = (\frac{5 - 3}{\sqrt{\frac{8}{3}}}, \ \ \frac{10 - 6}{\sqrt{\frac{32}{3}}}) = (\sqrt{\frac{3}{2}}, \ \ \sqrt{\frac{3}{2}}) \ \ \ \ 
+\hat{x}^{(3)} = (\frac{5 - 3}{\sqrt{\frac{8}{3}}}, \ \ \frac{10 - 6}{\sqrt{\frac{32}{3}}}) = (\sqrt{\frac{3}{2}}, \ \ \sqrt{\frac{3}{2}})  
 ```
+
 > 读者可以自行验证由 $\hat{x}^{(1)}, \hat{x}^{(2)}, \hat{x}^{(3)}$ 构成的mini-batch，是否满足均值为0，方差为1的分布。
 
 如果强行限制输出层的分布是标准化的，可能会导致某些特征模式的丢失，所以在标准化之后，BatchNorm会紧接着对数据做缩放和平移
@@ -505,6 +508,100 @@ y_i \leftarrow \gamma \hat{x_i} + \beta
 ```
 > 其中γ和β是可学习的参数，可以赋初始值γ=1,β=0，在训练过程中不断学习调整。
 
+上面列出的是BatchNorm方法的计算逻辑，下面针对两种类型的输入数据格式分别进行举例。飞桨支持输入数据的维度大小为2、3、4、5四种情况，这里给出的是维度大小为2和4的示例。
+
+示例一： 当输入数据形状是[N,K]时，一般对应全连接层的输出，示例代码如下所示。
+
+```python
+# 输入数据形状是 [N, K]时的示例
+import numpy as np
+import paddle
+from paddle.nn import BatchNorm1D
+# 创建数据
+data = np.array([[1,2,3], [4,5,6], [7,8,9]]).astype('float32')
+# 使用BatchNorm1D计算归一化的输出
+# 输入数据维度[N, K]，num_features等于K
+bn = BatchNorm1D(num_features=3)    
+x = paddle.to_tensor(data)
+y = bn(x)
+print('output of BatchNorm1D Layer: \n {}'.format(y.numpy()))
+
+# 使用Numpy计算均值、方差和归一化的输出
+# 这里对第0个特征进行验证
+a = np.array([1,4,7])
+a_mean = a.mean()
+a_std = a.std()
+b = (a - a_mean) / a_std
+print('std {}, mean {}, \n output {}'.format(a_mean, a_std, b))
+
+# 建议读者对第1和第2个特征进行验证，观察numpy计算结果与paddle计算结果是否一致
+```
+
+示例二： 当输入数据形状是[N,C,H,W]时， 一般对应卷积层的输出，示例代码如下所示
+
+这种情况下会沿着C这一维度进行展开，分别对每一个通道计算N个样本中总共N×H×W个像素点的均值和方差，数据和参数对应如下
+
+> “BatchNorm里面不是还要对标准化之后的结果做仿射变换吗，怎么使用Numpy计算的结果与BatchNorm算子一致？” 这是因为BatchNorm算子里面自动设置初始值γ=1,β=0\gamma = 1, \beta = 0γ=1,β=0，这时候仿射变换相当于是恒等变换。在训练过程中这两个参数会不断的学习，这时仿射变换就会起作用。
+
+```python
+# 输入数据形状是[N, C, H, W]时的batchnorm示例
+import numpy as np
+import paddle
+from paddle.nn import BatchNorm2D
+
+# 设置随机数种子，这样可以保证每次运行结果一致
+np.random.seed(100)
+# 创建数据
+data = np.random.rand(2,3,3,3).astype('float32')
+# 使用BatchNorm2D计算归一化的输出
+# 输入数据维度[N, C, H, W]，num_features等于C
+bn = BatchNorm2D(num_features=3)
+x = paddle.to_tensor(data)
+y = bn(x)
+print('input of BatchNorm2D Layer: \n {}'.format(x.numpy()))
+print('output of BatchNorm2D Layer: \n {}'.format(y.numpy()))
+
+# 取出data中第0通道的数据，
+# 使用numpy计算均值、方差及归一化的输出
+a = data[:, 0, :, :]
+a_mean = a.mean()
+a_std = a.std()
+b = (a - a_mean) / a_std
+print('channel 0 of input data: \n {}'.format(a))
+print('std {}, mean {}, \n output: \n {}'.format(a_mean, a_std, b))
+
+# 提示：这里通过numpy计算出来的输出
+# 与BatchNorm2D算子的结果略有差别，
+# 因为在BatchNorm2D算子为了保证数值的稳定性，
+# 在分母里面加上了一个比较小的浮点数epsilon=1e-05
+```
+
+**预测时使用BatchNorm**
+
+上面介绍了在训练过程中使用BatchNorm对一批样本进行归一化的方法，但如果使用同样的方法对需要预测的一批样本进行归一化，则预测结果会出现不确定性。
+
+例如样本A、样本B作为一批样本计算均值和方差，与样本A、样本C和样本D作为一批样本计算均值和方差，得到的结果一般来说是不同的。那么样本A的预测结果就会变得不确定，这对预测过程来说是不合理的。解决方法是在训练过程中将大量样本的均值和方差保存下来，预测时直接使用保存好的值而不再重新计算。实际上，在BatchNorm的具体实现中，训练时会计算均值和方差的移动平均值。在飞桨中，默认是采用如下方式计算：
+
+```math
+saved\_\mu_B \leftarrow \ saved\_\mu_B \times 0.9 + \mu_B \times (1 - 0.9)
+```
+
+```math
+saved\_\sigma_B^2 \leftarrow \ saved\_\sigma_B^2 \times 0.9 + \sigma_B^2 \times (1 - 0.9)
+```
+
+在训练过程的最开始将 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ 设置为0，每次输入一批新的样本，计算出 $\mu_B$ ​和 $\sigma_B^2$ ​，然后通过上面的公式更新 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ ​，在训练的过程中不断的更新它们的值，并作为BatchNorm层的参数保存下来。预测的时候将会加载参数 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ ​，用他们来代替 $\mu_B$ ​和 $\sigma_B^2$ ​。
+
+BatchNorm的变体包括：层归一化(Layer Normalization, LN)、组归一化(Group Normalization, GN)、实例归一化(Instance Normalization, IN)，通过下图进行比较，
+
+其中N知batch size、H和W分别表示特征图的高度和宽度、C表示特征图的通道数，蓝色像素表示使用相同的均值和方差进行归一化：
+
+![](./imgs/5aec4af01eb8451eb1695657a0bbc7e20181d7cd7e7b4136b04f9b2dedaca5c8.png)
+
+
+- LN：对[C,W,H]维度求均值方差进行归一化，即在通道方向做归一化，与batch size大小无关，在小batch size上效果可能更好
+- GN：先对通道方向进行分组，然后每个组内对[Ci​,W,H]维度进行归一化，也与batch size大小无关   
+- IN：只对[H,W]维度进行归一化，图像风格化任务适合使用IN算法
 
 #### 全连接层
 
@@ -536,7 +633,7 @@ y_i \leftarrow \gamma \hat{x_i} + \beta
 
 |         卷积作用         |                            卷积核                            |                    卷积后图像                     |
 | :----------------------: | :----------------------------------------------------------: | :-----------------------------------------------: |
-|         输出原图         | $\begin{bmatrix} 0 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 0 \end{bmatrix}$ |         ![origin_img](./imgs/cat.jpg)          |
+|         输出原图         | $$\begin{bmatrix} 0 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 0 \end{bmatrix}$$ |         ![origin_img](./imgs/cat.jpg)          |
 | 边缘检测（突出边缘差异） | $\begin{bmatrix} 1 & 0 & -1 \\ 0 & 0 & 0 \\ -1 & 0 & 1 \end{bmatrix}$ |   ![edgeDetect-1](./imgs/cat-edgeDetect.jpg)   |
 |  边缘检测（突出中间值）  | $\begin{bmatrix} -1 & -1 & -1 \\ -1 & 8 & -1 \\ -1 & -1 & -1 \end{bmatrix}$ |  ![edgeDetect-2](./imgs/cat-edgeDetect-2.jpg)  |
 |         图像锐化         | $\begin{bmatrix} 0 & -1 & 0 \\ -1 & 5 & -1 \\ 0 & -1 & 0 \end{bmatrix}$ |     ![sharpen_img](./imgs/cat-sharpen.jpg)     |
