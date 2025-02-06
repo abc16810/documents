@@ -633,7 +633,7 @@ BatchNorm的变体包括：层归一化(Layer Normalization, LN)、组归一化(
 
 |         卷积作用         |                            卷积核                            |                    卷积后图像                     |
 | :----------------------: | :----------------------------------------------------------: | :-----------------------------------------------: |
-|         输出原图         | $$\begin{bmatrix} 0 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 0 \end{bmatrix}$$ |         ![origin_img](./imgs/cat.jpg)          |
+|         输出原图         | $\begin{bmatrix}0&0&0\\0&1&0\\0&0&0\end{bmatrix}$ |  ![origin_img](./imgs/cat.jpg)          |
 | 边缘检测（突出边缘差异） | $\begin{bmatrix} 1 & 0 & -1 \\ 0 & 0 & 0 \\ -1 & 0 & 1 \end{bmatrix}$ |   ![edgeDetect-1](./imgs/cat-edgeDetect.jpg)   |
 |  边缘检测（突出中间值）  | $\begin{bmatrix} -1 & -1 & -1 \\ -1 & 8 & -1 \\ -1 & -1 & -1 \end{bmatrix}$ |  ![edgeDetect-2](./imgs/cat-edgeDetect-2.jpg)  |
 |         图像锐化         | $\begin{bmatrix} 0 & -1 & 0 \\ -1 & 5 & -1 \\ 0 & -1 & 0 \end{bmatrix}$ |     ![sharpen_img](./imgs/cat-sharpen.jpg)     |
