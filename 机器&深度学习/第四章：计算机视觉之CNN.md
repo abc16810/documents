@@ -630,15 +630,43 @@ BatchNorm的变体包括：层归一化(Layer Normalization, LN)、组归一化(
 
 图像与不同卷积核的卷积可以用来执行边缘检测、锐化和模糊等操作
 
+1、输出原图
+
+```math
+\begin{bmatrix}0&0&0\\0&1&0\\0&0&0\end{bmatrix}
+```
+2、边缘检测（突出边缘差异）
+
+```math
+\begin{bmatrix} 1 & 0 & -1 \\ 0 & 0 & 0 \\ -1 & 0 & 1 \end{bmatrix}
+```
+3、边缘检测（突出中间值）
+
+```math
+\begin{bmatrix} -1 & -1 & -1 \\ -1 & 8 & -1 \\ -1 & -1 & -1 \end{bmatrix}
+```
+4、图像锐化
+
+```math
+\begin{bmatrix} 0 & -1 & 0 \\ -1 & 5 & -1 \\ 0 & -1 & 0 \end{bmatrix}
+```
+5、方块模糊
+```math
+\begin{bmatrix} 1 & 1 & 1 \\ 1 & 1 & 1 \\ 1 & 1 & 1 \end{bmatrix} \times \frac{1}{9}
+```
+6、高斯模糊
+```math
+\begin{bmatrix} 1 & 2 & 1 \\ 2 & 4 & 2 \\ 1 & 2 & 1 \end{bmatrix} \times \frac{1}{16}
+```
 
 |         卷积作用         |                            卷积核                            |                    卷积后图像                     |
 | :----------------------: | :----------------------------------------------------------: | :-----------------------------------------------: |
-|         输出原图         | $\begin{bmatrix}0&0&0\\0&1&0\\0&0&0\end{bmatrix}$ |  ![origin_img](./imgs/cat.jpg)          |
-| 边缘检测（突出边缘差异） | $\begin{bmatrix} 1 & 0 & -1 \\ 0 & 0 & 0 \\ -1 & 0 & 1 \end{bmatrix}$ |   ![edgeDetect-1](./imgs/cat-edgeDetect.jpg)   |
-|  边缘检测（突出中间值）  | $\begin{bmatrix} -1 & -1 & -1 \\ -1 & 8 & -1 \\ -1 & -1 & -1 \end{bmatrix}$ |  ![edgeDetect-2](./imgs/cat-edgeDetect-2.jpg)  |
-|         图像锐化         | $\begin{bmatrix} 0 & -1 & 0 \\ -1 & 5 & -1 \\ 0 & -1 & 0 \end{bmatrix}$ |     ![sharpen_img](./imgs/cat-sharpen.jpg)     |
-|         方块模糊         | $\begin{bmatrix} 1 & 1 & 1 \\ 1 & 1 & 1 \\ 1 & 1 & 1 \end{bmatrix} \times \frac{1}{9}$ |      ![box_blur](./imgs/cat-boxblur.jpg)       |
-|         高斯模糊         | $\begin{bmatrix} 1 & 2 & 1 \\ 2 & 4 & 2 \\ 1 & 2 & 1 \end{bmatrix} \times \frac{1}{16}$ | ![gaussian_blur](./imgs/cat-blur-gaussian.jpg) |
+|         输出原图         | 1 |  ![origin_img](./imgs/cat.jpg)          |
+| 边缘检测（突出边缘差异） | 2 |   ![edgeDetect-1](./imgs/cat-edgeDetect.jpg)   |
+|  边缘检测（突出中间值）  | 3 |  ![edgeDetect-2](./imgs/cat-edgeDetect-2.jpg)  |
+|         图像锐化         | 4 |     ![sharpen_img](./imgs/cat-sharpen.jpg)     |
+|         方块模糊         | 5 |      ![box_blur](./imgs/cat-boxblur.jpg)       |
+|         高斯模糊         | 6 | ![gaussian_blur](./imgs/cat-blur-gaussian.jpg) |
 
 #### 卷积层有哪些基本参数
 
