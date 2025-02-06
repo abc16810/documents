@@ -713,13 +713,13 @@ BatchNorm的变体包括：层归一化(Layer Normalization, LN)、组归一化(
 
 |                  池化类型                   |                      示意图                       | 作用                                                         |
 | :-----------------------------------------: | :-----------------------------------------------: | :----------------------------------------------------------- |
-|          一般池化(General Pooling)          |   ![max_pooling](./imgs/general_pooling.png)   | 通常包括最大池化(Max Pooling)和平均池化(Mean Pooling)。以最大池化为例，池化范围$(2\times2)$和滑窗步长$(stride=2)$ 相同，仅提取一次相同区域的范化特征。 |
-|        重叠池化(Overlapping Pooling)        | ![overlap_pooling](./imgs/overlap_pooling.png) | 与一般池化操作相同，但是池化范围$P_{size}$与滑窗步长$stride$关系为$P_{size}>stride$，同一区域内的像素特征可以参与多次滑窗提取，得到的特征表达能力更强，但计算量更大。 |
+|          一般池化(General Pooling)          |   ![max_pooling](./imgs/general_pooling.png)   | 通常包括最大池化(Max Pooling)和平均池化(Mean Pooling)。以最大池化为例，池化范围 $(2\times2)$ 和滑窗步长 $(stride=2)$ 相同，仅提取一次相同区域的范化特征。 |
+|        重叠池化(Overlapping Pooling)        | ![overlap_pooling](./imgs/overlap_pooling.png) | 与一般池化操作相同，但是池化范围 $P_{size}$ 与滑窗步长 $stride$ 关系为 $P_{size}>stride$ ，同一区域内的像素特征可以参与多次滑窗提取，得到的特征表达能力更强，但计算量更大。 |
 | 空间金字塔池化$^*$(Spatial Pyramid Pooling) | ![spatial_pooling](./imgs/spatial_pooling.png) | 在进行多尺度目标的训练时，卷积层允许输入的图像特征尺度是可变的，紧接的池化层若采用一般的池化方法会使得不同的输入特征输出相应变化尺度的特征，而卷积神经网络中最后的全连接层则无法对可变尺度进行运算，因此需要对不同尺度的输出特征采样到相同输出尺度。 |
 
 
 
-> SPPNet$^{[3]}$就引入了空间池化的组合，对不同输出尺度采用不同的滑窗大小和步长以确保输出尺度相同$(win_{size}=\lceil \frac{in}{out}\rceil; stride=\lfloor \frac{in}{out}\rfloor; )$，同时用如金字塔式叠加的多种池化尺度组合，以提取更加丰富的图像特征。常用于多尺度训练和目标检测中的区域提议网络(Region Proposal Network)的兴趣区域(Region of Interest)提取
+> SPPNet $^{[3]}$ 就引入了空间池化的组合，对不同输出尺度采用不同的滑窗大小和步长以确保输出尺度相同 $(win_{size}=\lceil \frac{in}{out}\rceil; stride=\lfloor \frac{in}{out}\rfloor; )$ ，同时用如金字塔式叠加的多种池化尺度组合，以提取更加丰富的图像特征。常用于多尺度训练和目标检测中的区域提议网络(Region Proposal Network)的兴趣区域(Region of Interest)提取
 
 
 #### 深度可分离卷积
@@ -730,7 +730,7 @@ Depthwise(DW)卷积与Pointwise(PW)卷积，合起来被称作Depthwise Separabl
 
 对于一张5×5像素、三通道彩色输入图片（shape为5×5×3）。经过3×3卷积核的卷积层（假设输出通道数为4，则卷积核shape为3×3×3×4），最终输出4个Feature Map，如果有same padding则尺寸与输入层相同（5×5），如果没有则为尺寸变为3×3。
 
-![](./imgs/20180812161250650.png)
+<div style='width:300px;height:300px'><center><img src='./imgs/20180812161250650.png'></center></div>
 
  Depthwise Separable Convolution是将一个完整的卷积运算分解为两步进行，即Depthwise Convolution与Pointwise Convolution。
 
