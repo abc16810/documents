@@ -172,6 +172,21 @@ W_{out} = \frac{100 + 2 - 3}{2} + 1 = 50
 
 **多输出通道场景**
 
+一般来说，卷积操作的输出特征图也会具有多个通道 $C_{out}$ ​，这时我们需要设计 $C_{out}$ ​个维度为 $C_{in}\times{k_h}\times{k_w}$ ​的卷积核，卷积核数组的维度是 $C_{out}\times C_{in}\times{k_h}\times{k_w}$ ​，如 图8 所示
+
+1、对任一输出通道 $c_{out} \in [0, C_{out})$ ，分别使用上面描述的形状为 $C_{in}\times{k_h}\times{k_w}$ 的卷积核对输入图片做卷积
+2、将这 $C_{out}$ ​个形状为 $H_{out}\times{W_{out}}$ ​的二维数组拼接在一起，形成维度为 $C_{out}\times{H_{out}}\times{W_{out}}$ ​的三维数组。
+
+> 通常将卷积核的输出通道数叫做卷积核的个数。
+
+![](./imgs/cf1fbddc141349e4b7aaeade9a201b78a16d249e069c4f8aaeb77e0ea1a95c31.png)
+
+
+**批量操作**
+
+在卷积神经网络的计算中，通常将多个样本放在一起形成一个mini-batch进行批量操作，即输入数据的维度是 $N\times{C_{in}}\times{H_{in}}\times{W_{in}}$ ​。由于会对每张图片使用同样的卷积核进行卷积操作，卷积核的维度与上面多输出通道的情况一样，仍然是 $C_{out}\times C_{in}\times{k_h}\times{k_w}$ ，输出特征图的维度是 $N\times{C_{out}}\times{H_{out}}\times{W_{out}}$ ​，如 图9 所示
+
+![](./imgs/60760d68001c40d6a6c500b17f57d8deae7b5921631b4b6b896b057b904d24b1.jpg)
 
 
 #### 激活层
