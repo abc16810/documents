@@ -590,7 +590,7 @@ saved\_\mu_B \leftarrow \ saved\_\mu_B \times 0.9 + \mu_B \times (1 - 0.9)
 saved\_\sigma_B^2 \leftarrow \ saved\_\sigma_B^2 \times 0.9 + \sigma_B^2 \times (1 - 0.9)
 ```
 
-在训练过程的最开始将 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ 设置为0，每次输入一批新的样本，计算出 $\mu_B$ ​和 $\sigma_B^2$ ​，然后通过上面的公式更新 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ ​，在训练的过程中不断的更新它们的值，并作为BatchNorm层的参数保存下来。预测的时候将会加载参数 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ ​，用他们来代替 $\mu_B$ ​和 $\sigma_B^2$ ​。
+在训练过程的最开始将 $saved_{\mu_B}$ ​和 $saved_{\sigma_B^2}​$ 设置为0，每次输入一批新的样本，计算出 $\mu_B$ ​和 $\sigma_B^2$ ​，然后通过上面的公式更新 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ ​，在训练的过程中不断的更新它们的值，并作为BatchNorm层的参数保存下来。预测的时候将会加载参数 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ ​，用他们来代替 $\mu_B$ ​和 $\sigma_B^2$ ​。
 
 BatchNorm的变体包括：层归一化(Layer Normalization, LN)、组归一化(Group Normalization, GN)、实例归一化(Instance Normalization, IN)，通过下图进行比较，
 
