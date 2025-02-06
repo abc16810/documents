@@ -590,7 +590,7 @@ saved\_\mu_B \leftarrow \ saved\_\mu_B \times 0.9 + \mu_B \times (1 - 0.9)
 saved\_\sigma_B^2 \leftarrow \ saved\_\sigma_B^2 \times 0.9 + \sigma_B^2 \times (1 - 0.9)
 ```
 
-在训练过程的最开始将 $saved_{\mu_B}$ ​和 $saved_{\sigma_B^2}​$ 设置为0，每次输入一批新的样本，计算出 $\mu_B$ ​和 $\sigma_B^2$ ​，然后通过上面的公式更新 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ ​，在训练的过程中不断的更新它们的值，并作为BatchNorm层的参数保存下来。预测的时候将会加载参数 $saved\_\mu_B$ ​和 $saved\_\sigma_B^2​$ ​，用他们来代替 $\mu_B$ ​和 $\sigma_B^2$ ​。
+在训练过程的最开始将 $saved_{\mu_B}$ ​和 $saved_{\sigma_B^2}​$ 设置为0，每次输入一批新的样本，计算出 $\mu_B$ ​和 $\sigma_B^2$ ​，然后通过上面的公式更新 $saved_{\mu_B}$ ​和 $saved_{\sigma_B^2}​$ ​，在训练的过程中不断的更新它们的值，并作为BatchNorm层的参数保存下来。预测的时候将会加载参数 $saved_{\mu_B}$ ​和 $saved_{\sigma_B^2}​$ ​，用他们来代替 $\mu_B$ ​和 $\sigma_B^2$ ​。
 
 BatchNorm的变体包括：层归一化(Layer Normalization, LN)、组归一化(Group Normalization, GN)、实例归一化(Instance Normalization, IN)，通过下图进行比较，
 
@@ -675,18 +675,20 @@ BatchNorm的变体包括：层归一化(Layer Normalization, LN)、组归一化(
 
 |          参数名           | 作用                                                         | 常见设置                                                     |
 | :-----------------------: | :----------------------------------------------------------- | :----------------------------------------------------------- |
-| 卷积核大小 (Kernel Size)  | 卷积核的大小定义了卷积的感受野                               | 在过去常设为5，如LeNet-5；现在多设为3，通过堆叠$3\times3$的卷积核来达到更大的感受域 |
+| 卷积核大小 (Kernel Size)  | 卷积核的大小定义了卷积的感受野                               | 在过去常设为5，如LeNet-5；现在多设为3，通过堆叠 $3\times3$ 的卷积核来达到更大的感受域 |
 |    卷积核步长 (Stride)    | 定义了卷积核在卷积过程中的步长                               | 常见设置为1，表示滑窗距离为1，可以覆盖所有相邻位置特征的组合；当设置为更大值时相当于对特征组合降采样 |
 |    填充方式 (Padding)     | 在卷积核尺寸不能完美匹配输入的图像矩阵时需要进行一定的填充策略 | 设置为'SAME'表示对不足卷积核大小的边界位置进行某种填充（通常零填充）以保证卷积输出维度与与输入维度一致；当设置为'VALID'时则对不足卷积尺寸的部分进行舍弃，输出维度就无法保证与输入维度一致 |
 | 输入通道数 (In Channels)  | 指定卷积操作时卷积核的深度                                   | 默认与输入的特征矩阵通道数（深度）一致；在某些压缩模型中会采用通道分离的卷积方式 |
 | 输出通道数 (Out Channels) | 指定卷积核的个数                                             | 若设置为与输入通道数一样的大小，可以保持输入输出维度的一致性；若采用比输入通道数更小的值，则可以减少整体网络的参数量 |
 
 
-> 卷积操作维度变换公式：
->
-> $O_d =\begin{cases} \lceil \frac{(I_d - k_{size})+ 1)}{s}\rceil ,& \text{padding=VALID}\\ \lceil \frac{I_d}{s}\rceil,&\text{padding=SAME} \end{cases}$
->
-> 其中，$I_d$为输入维度，$O_d$为输出维度，$k_{size}$为卷积核大小，$s$为步长
+卷积操作维度变换公式：
+ 
+```math
+ O_d =\begin{cases} \lceil \frac{(I_d - k_{size})+ 1)}{s}\rceil ,& \text{padding=VALID}\\ \lceil \frac{I_d}{s}\rceil,&\text{padding=SAME} \end{cases}
+```
+
+> 其中， $I_d$ 为输入维度， $O_d$ 为输出维度， $k_{size}$ 为卷积核大小， $s$ 为步长
 
 
 #### 卷积核有什么类型？
