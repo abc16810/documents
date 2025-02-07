@@ -208,7 +208,7 @@ class LeNet(paddle.nn.Layer):
         self.max_pool2 = MaxPool2D(kernel_size=2, stride=2)   
 
         # 创建第3个卷积层
-        self.conv3 = Conv2D(in_channels=16, out_channels=120, kernel_size=4)   # [N, 120, 1, 1]
+        self.conv3 = Conv2D(in_channels=16, out_channels=120, kernel_size=4)   # [N, 120, 50, 50]
 
         # 尺寸的逻辑：输入层将数据拉平[B,C,H,W] -> [B,C*H*W]
         # 输入size是[50,50]，经过三次卷积和两次池化之后，C*H*W等于120
@@ -329,5 +329,37 @@ opt = paddle.optimizer.Momentum(learning_rate=0.001, momentum=0.9, parameters=mo
 train(model, optimizer=opt)
 ```
 
+```
+epoch: 0, batch_id: 0, loss is: 0.6743
+epoch: 0, batch_id: 20, loss is: 0.7091
+[validation] accuracy/loss: 0.5275/0.6922
+epoch: 1, batch_id: 0, loss is: 0.6893
+epoch: 1, batch_id: 20, loss is: 0.6466
+[validation] accuracy/loss: 0.5275/0.6919
+epoch: 2, batch_id: 0, loss is: 0.6817
+epoch: 2, batch_id: 20, loss is: 0.6933
+[validation] accuracy/loss: 0.5275/0.6923
+epoch: 3, batch_id: 0, loss is: 0.6974
+epoch: 3, batch_id: 20, loss is: 0.7262
+[validation] accuracy/loss: 0.5275/0.6916
+epoch: 4, batch_id: 0, loss is: 0.7177
+epoch: 4, batch_id: 20, loss is: 0.6848
+[validation] accuracy/loss: 0.5275/0.6918
+epoch: 5, batch_id: 0, loss is: 0.6793
+epoch: 5, batch_id: 20, loss is: 0.6601
+[validation] accuracy/loss: 0.5275/0.6917
+epoch: 6, batch_id: 0, loss is: 0.7195
+epoch: 6, batch_id: 20, loss is: 0.7223
+[validation] accuracy/loss: 0.5275/0.6918
+epoch: 7, batch_id: 0, loss is: 0.6815
+epoch: 7, batch_id: 20, loss is: 0.7255
+[validation] accuracy/loss: 0.5275/0.6919
+epoch: 8, batch_id: 0, loss is: 0.6873
+epoch: 8, batch_id: 20, loss is: 0.6783
+[validation] accuracy/loss: 0.5275/0.6917
+epoch: 9, batch_id: 0, loss is: 0.7031
+epoch: 9, batch_id: 20, loss is: 0.6886
+[validation] accuracy/loss: 0.5275/0.6918
+```
 
 通过运行结果可以看出，在眼疾筛查数据集iChallenge-PM上，LeNet的loss很难下降，模型没有收敛。这是因为MNIST数据集的图片尺寸比较小（ 28*28 ），但是眼疾筛查数据集图片尺寸比较大（原始图片尺寸约为 2000*2000，经过缩放之后变成 224*224 ），LeNet模型很难进行有效分类。这说明在图片尺寸比较大时，LeNet在图像分类任务上存在局限性
