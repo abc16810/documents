@@ -1,75 +1,79 @@
 iChallenge-PM是百度大脑和中山大学中山眼科中心联合举办的iChallenge比赛中，提供的关于病理性近视（Pathologic Myopia，PM）的医疗类数据集，包含1200个受试者的眼底视网膜图片，训练、验证和测试数据集各400张。下面我们详细介绍LeNet在iChallenge-PM上的训练过程。
 
 
-#### 数据集准备
-
-- training.zip：包含训练中的图片和标签
-- validation.zip：包含验证集的图片
-- valid_gt.zip：包含验证集的标签 
-
-解压后
-
-```
-训练图片目录：./PALM-Training400/PALM-Training400
-验证图片目录：./PALM-Validation400
-验证标签文件：./labels.csv
-```
-
-> valid_gt.zip文件解压缩之后，需要将PALM-Validation-GT/目录下的PM_Label_and_Fovea_Location.xlsx文件转存成csv格式，本节代码示例中已经提前转成文件labels.csv
-
-
-#### 查看数据集图片
-
-iChallenge-PM中既有病理性近视患者的眼底图片，也有非病理性近视患者的图片，命名规则如下：
-- 病理性近视（PM）：文件名以P开头
-- 非病理性近视（non-PM）
-    - 高度近似（high myopia）：文件名以H开头
-    - 正常眼睛（normal）：文件名以N开头
-
-我们将病理性患者的图片作为正样本，标签为1； 非病理性患者的图片作为负样本，标签为0。从数据集中选取两张图片，通过LeNet提取特征，构建分类器，对正负样本进行分类，并将图片显示出来。代码如下所示：
-
 ```python
+# 导入需要的包
 import os
+import random
+
+import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-%matplotlib inline
-from PIL import Image
-DATADIR = 'F:/项目/AI/tests/imgs'
-# 文件名以N开头的是正常眼底图片，以P开头的是病变眼底图片
-file1 = 'N0012.jpg'
-file2 = 'P0095.jpg'
-# 读取图片
-img1 = Image.open(os.path.join(DATADIR, file1))
-img1 = np.array(img1)
-img2 = Image.open(os.path.join(DATADIR, file2))
-img2 = np.array(img2)
-# 画出读取的图片
-plt.figure(figsize=(16, 8))
-f = plt.subplot(121)
-f.set_title('Normal', fontsize=20)
-plt.imshow(img1)
-f = plt.subplot(122)
-f.set_title('PM', fontsize=20)
-plt.imshow(img2)
-plt.show()
-```
+import paddle
+## 组网
+import paddle.nn.functional as F
+from paddle.nn import Conv2D, Dropout, Linear, MaxPool2D
+from paddle.vision.datasets import MNIST
+from paddle.vision.transforms import ToTensor
 
-![](https://static.sitestack.cn/projects/paddlepaddle-tutorials/d0407c759ba94fa9d3a5b299a22f897b.png)
-
-```
-# 查看图片形状
-print(img1.shape, img2.shape)
-```
-(2056, 2124, 3) (2056, 2124, 3)
+EPOCH_NUM = 10
 
 
+# 定义 AlexNet 网络结构
+class AlexNet(paddle.nn.Layer):
+    def __init__(self, num_classes=1):
+        super(AlexNet, self).__init__()
+        # AlexNet与LeNet一样也会同时使用卷积和池化层提取图像特征
+        # 与LeNet不同的是激活函数换成了‘relu’
+        self.conv1 = Conv2D(in_channels=3, out_channels=96, kernel_size=11, stride=4, padding=5)
+        self.max_pool1 = MaxPool2D(kernel_size=2, stride=2)
+        self.conv2 = Conv2D(in_channels=96, out_channels=256, kernel_size=5, stride=1, padding=2)
+        self.max_pool2 = MaxPool2D(kernel_size=2, stride=2)
+        self.conv3 = Conv2D(in_channels=256, out_channels=384, kernel_size=3, stride=1, padding=1)
+        self.conv4 = Conv2D(in_channels=384, out_channels=384, kernel_size=3, stride=1, padding=1)
+        self.conv5 = Conv2D(in_channels=384, out_channels=256, kernel_size=3, stride=1, padding=1)
+        self.max_pool5 = MaxPool2D(kernel_size=2, stride=2)
 
-#### 定义数据读取器
+        self.fc1 = Linear(in_features=12544, out_features=4096)
+        self.drop_ratio1 = 0.5
+        self.drop1 = Dropout(self.drop_ratio1)
+        self.fc2 = Linear(in_features=4096, out_features=4096)
+        self.drop_ratio2 = 0.5
+        self.drop2 = Dropout(self.drop_ratio2)
+        self.fc3 = Linear(in_features=4096, out_features=num_classes)
+    
+    def forward(self, x):
+        x = self.conv1(x)
+        x = F.relu(x)
+        x = self.max_pool1(x)
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = self.max_pool2(x)
+        x = self.conv3(x)
+        x = F.relu(x)
+        x = self.conv4(x)
+        x = F.relu(x)
+        x = self.conv5(x)
+        x = F.relu(x)
+        x = self.max_pool5(x)
+        x = paddle.reshape(x, [x.shape[0], -1])
+        x = self.fc1(x)
+        x = F.relu(x)
+        # 在全连接之后使用dropout抑制过拟合
+        x = self.drop1(x)
+        x = self.fc2(x)
+        x = F.relu(x)
+        # 在全连接之后使用dropout抑制过拟合
+        x = self.drop2(x)
+        x = self.fc3(x)
+        return x
 
 
-使用OpenCV从磁盘读入图片，将每张图缩放到224*224大小，并且将像素值调整到[-1,1]之间，代码如下所示：
+DATADIR = '/srv/data/palm/PALM-Training400/PALM-Training400'
+# DATADIR = '/home/aistudio/work/palm/PALM-Training400/PALM-Training400'
+DATADIR2 = '/srv/data/palm/PALM-Validation400'
+# DATADIR2 = '/home/aistudio/work/palm/PALM-Validation400'
+CSVFILE = '/srv/data/palm/labels.csv'
 
-```python
 # 对读入的图像数据进行预处理
 def transform_img(img):
     # 将图片尺寸缩放道 224x224
@@ -82,6 +86,7 @@ def transform_img(img):
     img = img / 255.
     img = img * 2.0 - 1.0
     return img
+
 
 # 定义训练集数据读取器
 def data_loader(datadir, batch_size=10, mode = 'train'):
@@ -127,6 +132,8 @@ def data_loader(datadir, batch_size=10, mode = 'train'):
             yield imgs_array, labels_array
     return reader
 
+
+
 # 定义验证集数据读取器
 def valid_data_loader(datadir, csvfile, batch_size=10, mode='valid'):
     # 训练集读取时通过文件名来确定样本标签，验证集则通过csvfile来读取每个图片对应的标签
@@ -169,100 +176,10 @@ def valid_data_loader(datadir, csvfile, batch_size=10, mode='valid'):
             yield imgs_array, labels_array
 
     return reader
-```
-
-#### 查看数据形状
-
-```python
-train_loader = data_loader(DATADIR, 
-                           batch_size=10, mode='train')
-data_reader = train_loader()
-data = next(data_reader)
-print(data[0].shape, data[1].shape)
-
-eval_loader = data_loader(DATADIR, 
-                           batch_size=10, mode='eval')
-data_reader = eval_loader()
-data = next(data_reader)
-print(data[0].shape, data[1].shape)
-```
-```
-(10, 3, 224, 224), (10, 1)
-(10, 3, 224, 224), (10, 1)
-```
-
-#### 定义网络
-
-```python
-class LeNet(paddle.nn.Layer):
-
-    def __init__(self, num_classes=1):
-        super(LeNet, self).__init__()
-
-     
-        # 创建卷积和池化层块，每个卷积层使用Sigmoid激活函数，后面跟着一个2x2的池化
-        self.conv1 = Conv2D(in_channels=3, out_channels=6, kernel_size=5)  # [N,3,h,w]  -> [N, 6, h, w]
-        self.max_pool1 = MaxPool2D(kernel_size=2, stride=2)   #   [N, 6, h/2, w/2]
-
-        self.conv2 = Conv2D(in_channels=6, out_channels=16, kernel_size=5)
-        self.max_pool2 = MaxPool2D(kernel_size=2, stride=2)   
-
-        # 创建第3个卷积层
-        self.conv3 = Conv2D(in_channels=16, out_channels=120, kernel_size=4)   # [N, 120, 50, 50]
-
-        # 尺寸的逻辑：输入层将数据拉平[B,C,H,W] -> [B,C*H*W]
-        # 输入size是[50,50]，经过三次卷积和两次池化之后，C*H*W等于120
-        # 创建全连接层，第一个全连接层的输出神经元个数为64
-        self.fc1 = Linear(in_features=300000, out_features=64)
-        # 第二个全连接层输出神经元个数为分类标签的类别数
-        self.fc2 = Linear(in_features=64, out_features=num_classes)
 
 
-    # 网络的前向计算过程
-    def forward(self, x, label=None):
-        x = self.conv1(x)
-        # 每个卷积层使用Sigmoid激活函数，后面跟着一个2x2的池化
-        x = F.sigmoid(x)
-        x = self.max_pool1(x)
-        x = F.sigmoid(x)
-        x = self.conv2(x)
-        x = self.max_pool2(x)
-        x = self.conv3(x)
-        x = F.sigmoid(x)
 
-        # 尺寸的逻辑：输入层将数据拉平[B,C,H,W] -> [B,C*H*W]
-        x = paddle.reshape(x, [x.shape[0], -1])
-        x = self.fc1(x)
-        x = F.sigmoid(x)
-        x = self.fc2(x)
-        if label is not None:
-            if self.num_classes == 1:
-                pred = F.sigmoid(x)
-                pred = paddle.concat([1.0 - pred, pred], axis=1)
-
-                acc = paddle.metric.accuracy(pred, paddle.cast(label, dtype='int64'))
-            else:
-                acc = paddle.metric.accuracy(x, paddle.cast(label, dtype='int64'))
-            return x, acc
-
-        else:
-            return x
-
-        return x
-```
-
-#### 定义训练过程
-
-```python
-
-DATADIR = '/srv/data/palm/PALM-Training400/PALM-Training400'
-# DATADIR = '/home/aistudio/work/palm/PALM-Training400/PALM-Training400'
-DATADIR2 = '/srv/data/palm/PALM-Validation400'
-# DATADIR2 = '/home/aistudio/work/palm/PALM-Validation400'
-CSVFILE = '/srv/data/palm/labels.csv'
-
-EPOCH_NUM = 10
-
+# 定义训练过程
 def train(model, optimizer):
     # 开启0号GPU训练
     paddle.device.set_device('gpu:0')
@@ -309,7 +226,6 @@ def train(model, optimizer):
             pred2 = pred * (-1.0) + 1.0
             # 得到两个类别的预测概率，并沿第一个维度级联
             pred = paddle.concat([pred2, pred], axis=1)
-            print(pred, label)
             acc = paddle.metric.accuracy(pred, paddle.cast(label, dtype='int64'))
 
             accuracies.append(acc.numpy())
@@ -322,44 +238,55 @@ def train(model, optimizer):
         paddle.save(optimizer.state_dict(), 'palm.pdopt')
 
 
+# 查看数据形状
+
+train_loader = data_loader(DATADIR, 
+                           batch_size=10, mode='train')
+data_reader = train_loader()
+data = next(data_reader)
+print(data[0].shape, data[1].shape)
+
+eval_loader = data_loader(DATADIR, 
+                           batch_size=10, mode='eval')
+data_reader = eval_loader()
+data = next(data_reader)
+print(data[0].shape, data[1].shape)
+
+
+
 # 创建模型
-model = LeNet(num_classes=1)
+model = AlexNet()
 # 启动训练过程
 opt = paddle.optimizer.Momentum(learning_rate=0.001, momentum=0.9, parameters=model.parameters())
 train(model, optimizer=opt)
 ```
 
-```
-epoch: 0, batch_id: 0, loss is: 0.6743
-epoch: 0, batch_id: 20, loss is: 0.7091
-[validation] accuracy/loss: 0.5275/0.6922
-epoch: 1, batch_id: 0, loss is: 0.6893
-epoch: 1, batch_id: 20, loss is: 0.6466
-[validation] accuracy/loss: 0.5275/0.6919
-epoch: 2, batch_id: 0, loss is: 0.6817
-epoch: 2, batch_id: 20, loss is: 0.6933
-[validation] accuracy/loss: 0.5275/0.6923
-epoch: 3, batch_id: 0, loss is: 0.6974
-epoch: 3, batch_id: 20, loss is: 0.7262
-[validation] accuracy/loss: 0.5275/0.6916
-epoch: 4, batch_id: 0, loss is: 0.7177
-epoch: 4, batch_id: 20, loss is: 0.6848
-[validation] accuracy/loss: 0.5275/0.6918
-epoch: 5, batch_id: 0, loss is: 0.6793
-epoch: 5, batch_id: 20, loss is: 0.6601
-[validation] accuracy/loss: 0.5275/0.6917
-epoch: 6, batch_id: 0, loss is: 0.7195
-epoch: 6, batch_id: 20, loss is: 0.7223
-[validation] accuracy/loss: 0.5275/0.6918
-epoch: 7, batch_id: 0, loss is: 0.6815
-epoch: 7, batch_id: 20, loss is: 0.7255
-[validation] accuracy/loss: 0.5275/0.6919
-epoch: 8, batch_id: 0, loss is: 0.6873
-epoch: 8, batch_id: 20, loss is: 0.6783
-[validation] accuracy/loss: 0.5275/0.6917
-epoch: 9, batch_id: 0, loss is: 0.7031
-epoch: 9, batch_id: 20, loss is: 0.6886
-[validation] accuracy/loss: 0.5275/0.6918
-```
 
-通过运行结果可以看出，在眼疾筛查数据集iChallenge-PM上，LeNet的loss很难下降，模型没有收敛。这是因为MNIST数据集的图片尺寸比较小（ 28*28 ），但是眼疾筛查数据集图片尺寸比较大（原始图片尺寸约为 2000*2000，经过缩放之后变成 224*224 ），LeNet模型很难进行有效分类。这说明在图片尺寸比较大时，LeNet在图像分类任务上存在局限性
+```
+epoch: 0, batch_id: 0, loss is: 0.9839
+epoch: 0, batch_id: 20, loss is: 0.6314
+[validation] accuracy/loss: 0.9050/0.2619
+epoch: 1, batch_id: 0, loss is: 0.3244
+epoch: 1, batch_id: 20, loss is: 0.1798
+[validation] accuracy/loss: 0.9325/0.2074
+epoch: 2, batch_id: 0, loss is: 0.2174
+epoch: 2, batch_id: 20, loss is: 0.2843
+[validation] accuracy/loss: 0.9075/0.2522
+epoch: 3, batch_id: 0, loss is: 0.3652
+epoch: 3, batch_id: 20, loss is: 0.4514
+[validation] accuracy/loss: 0.9300/0.2130
+epoch: 4, batch_id: 0, loss is: 0.0876
+epoch: 4, batch_id: 20, loss is: 0.2053
+[validation] accuracy/loss: 0.9225/0.1847
+epoch: 5, batch_id: 0, loss is: 0.1311
+epoch: 5, batch_id: 20, loss is: 0.5157
+[validation] accuracy/loss: 0.9325/0.1569
+epoch: 6, batch_id: 0, loss is: 0.0563
+epoch: 6, batch_id: 20, loss is: 0.1793
+[validation] accuracy/loss: 0.9425/0.1650
+...
+```
+通过运行结果可以发现，在眼疾筛查数据集iChallenge-PM上使用AlexNet，loss能有效下降，经过5个epoch的训练，在验证集上的准确率可以达到94%左右
+
+
+
