@@ -328,3 +328,6 @@ model = LeNet(num_classes=1)
 opt = paddle.optimizer.Momentum(learning_rate=0.001, momentum=0.9, parameters=model.parameters())
 train(model, optimizer=opt)
 ```
+
+
+通过运行结果可以看出，在眼疾筛查数据集iChallenge-PM上，LeNet的loss很难下降，模型没有收敛。这是因为MNIST数据集的图片尺寸比较小（ 28*28 ），但是眼疾筛查数据集图片尺寸比较大（原始图片尺寸约为 2000*2000，经过缩放之后变成 224*224 ），LeNet模型很难进行有效分类。这说明在图片尺寸比较大时，LeNet在图像分类任务上存在局限性
