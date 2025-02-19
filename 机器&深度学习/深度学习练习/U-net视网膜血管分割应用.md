@@ -50,14 +50,30 @@ model:
 
 ##### encode 部分
 
-| input | name | Operator | output|
-| --- | --- | --- | ---|
-| N * 3 *128 * 128 | double_conv0 | ConvBNReLU 3*3 64 same  | N * 64 *128 * 128 |
-| N * 64 *128 * 128 | double_conv1 | ConvBNReLU 3*3 64 same  | N * 64 * 128 * 128 |
-| N * 64 *128 * 128 | down_sample_0_0 | MaxPool2D 2*2 s=2 | N * 64 * 64 * 64 |
-|  |  |  |  |
-|  |  |  |  |
-|  |  |  |  |
+| input | name | Operator | output| cuts |
+| --- | --- | --- | ---| --- |
+| N * 3 *128 * 128 | double_conv0 | ConvBNReLU 3*3 64 same  | N * 64 *128 * 128 | |
+| N * 64 *128 * 128 | double_conv1 | ConvBNReLU 3*3 64 same  | N * 64 * 128 * 128 | y0 |
+| N * 64 *128 * 128 | down_sample_0_0 | MaxPool2D 2*2 s=2 | N * 64 * 64 * 64 | |
+| N * 64 *64 * 64 | down_sample_0_1 | ConvBNReLU 3*3 128 same | N * 128 * 64 * 64 | |
+| N * 128 *64 * 64 | down_sample_0_2 | ConvBNReLU 3*3 128 same | N * 128 * 64 * 64 | y1 |
+| N * 128 *64 * 64 | down_sample_1_0 | MaxPool2D 2*2 s=2 | N * 128 * 32 * 32 | |
+| N * 128 *32 * 23 | down_sample_1_1 | ConvBNReLU 3*3 256 same | N * 256 * 32 * 32 | |
+| N * 256 *32 * 32 | down_sample_1_2 | ConvBNReLU 3*3 256 same | N * 256 * 32 * 32 | y2|
+| N * 256 *32 * 32 | down_sample_2_0 | MaxPool2D 2*2 s=2 | N * 256 * 16 * 16 | |
+| N * 256 *16 * 16 | down_sample_2_1 | ConvBNReLU 3*3 512 same | N * 512 * 16 * 16 | |
+| N * 512 *16 * 16 | down_sample_2_2 | ConvBNReLU 3*3 512 same | N * 512 * 16 * 16 | y3 |
+| N * 512 *16 * 16 | down_sample_3_0 | MaxPool2D 2*2 s=2 | N * 512 * 8 * 8 | |
+| N * 512 *8 * 8 | down_sample_3_1 | ConvBNReLU 3*3 512 same | N * 512 * 8 * 8 | |
+| N * 512 *8 * 8 | down_sample_3_2 | ConvBNReLU 3*3 512 same | N * 512 * 8 * 8 | |
+
+通过encode部分返回down_sample_3_2 和 [y0,y1,y2,y3]
+
+
+##### decode 部分
+
+
+
 
 
 > padding = 'same' 输出的宽和高不变
