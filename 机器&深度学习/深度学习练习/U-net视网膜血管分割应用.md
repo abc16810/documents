@@ -69,11 +69,61 @@ model:
 
 通过encode部分返回down_sample_3_2 和 [y0,y1,y2,y3]
 
+> padding = 'same' 输出的宽和高不变
 
 ##### decode 部分
 
+通过上采样进行像素的分类
+
+down_sample_3_2 = [4, 512, 8, 8]
+y3 = [4, 512, 16, 16]
+
+1、当use_deconv=True 时通过反卷积上采样，否则通过线性插值上采样
+
+```
+x = F.interpolate(down_sample_3_2, ... mode='bilinear',...)
+```
+2、通过paddle.concat 沿通道联结
+
+```
+output = paddle.concat([x, y3], axis=1)
+# [4, 1024, 16, 16]
+```
+3、再进行如下卷积
+
+| input | name | Operator | output| 
+| --- | --- | --- | ---| 
+| output | double_conv0 | ConvBNReLU 3*3 256 same  | 4 * 256 *16 * 16 |
+| 4 * 256 *16 * 16 | double_conv1 | ConvBNReLU 3*3 256 same  | 4 * 256 *16 * 16 | 
+
+输出【4,256,16,16】 和 y2 = [4, 256, 32, 32 ] 一并作为输入再次进行如上步骤 1,2 
+输出 [4, 512, 32, 32]
+
+再进行如下卷积
+
+| input | name | Operator | output| 
+| --- | --- | --- | ---| 
+| output | double_conv0 | ConvBNReLU 3*3 128 same  | 4 * 128 *32 * 32 | 
+| 4 * 128 *32 * 32 | double_conv1 | ConvBNReLU 3*3 128 same  | 4 * 128 *32 * 32 | 
 
 
+输出【4,128,32,32] 和 y1 = [4, 128, 64, 64 ] 一并作为输入再次进行如上步骤 1,2 
+输出 [4, 256, 64, 64]
+
+再进行如下卷积
+
+| input | name | Operator | output| 
+| --- | --- | --- | ---| 
+| output | double_conv0 | ConvBNReLU 3*3 64 same  | 4 * 64 *64 * 64 | 
+| 4 * 128 *32 * 32 | double_conv1 | ConvBNReLU 3*3 64 same  | 4 * 64 *64 * 64 | 
 
 
-> padding = 'same' 输出的宽和高不变
+输出【4,64,64,46] 和 y0 = [4, 64, 128, 128 ] 一并作为输入再次进行如上步骤 1,2 
+输出 [4, 128, 128, 128]
+
+再进行如下卷积
+
+| input | name | Operator | output| 
+| --- | --- | --- | ---| 
+| output | double_conv0 | ConvBNReLU 3*3 64 same  | 4 * 64 *128 * 128 | 
+| 4 * 128 *32 * 32 | double_conv1 | ConvBNReLU 3*3 64 same  | 4 * 64 *128 * 128 | 
