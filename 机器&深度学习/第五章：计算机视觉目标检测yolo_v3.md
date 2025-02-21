@@ -446,6 +446,7 @@ print(C0.shape, C1.shape, C2.shape)
 
 ![](./imgs/b6d3b425644342e48bd0a50ebde90d882fd10717e0e44a53a44e98225bbb6df8.png)
 
+> upsample 上采样是通过`F.interpolate`线性插值方法
 > 生成多层级的输出特征图P0、P1、P2 
 
 
