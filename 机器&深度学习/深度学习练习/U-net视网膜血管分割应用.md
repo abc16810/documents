@@ -127,3 +127,73 @@ output = paddle.concat([x, y3], axis=1)
 | --- | --- | --- | ---| 
 | output | double_conv0 | ConvBNReLU 3*3 64 same  | 4 * 64 *128 * 128 | 
 | 4 * 128 *32 * 32 | double_conv1 | ConvBNReLU 3*3 64 same  | 4 * 64 *128 * 128 | 
+
+
+最终输出[4, 64, 128, 128]
+
+
+##### cls
+
+输出类别
+
+```
+Conv2D(64, num_classes, kernel_size=[3, 3], padding=1, data_format=NCHW)
+```
+
+如类别为2 即num_classes=2 输出如下
+
+[4, 2, 128, 128]
+
+
+
+#### 损失
+
+```
+loss:
+  types:
+    - type: DiceLoss   # 损失
+  coef: [1]   # 系数
+
+```
+
+Dice Loss（Dice Coefficient Loss）是一种在图像分割任务中广泛使用的损失函数，特别适用于像素级别的二分类或多分类任务，如医疗图像分割。Dice系数原本是衡量两个集合相似度的一种指标，其值范围在0到1之间，值越接近1表示重叠程度越高，反之则表示重叠程度越低。
+
+
+假设我们的模型预测结果为 ( P )（二维或三维张量，每个像素点对应一个预测类别概率），真实标签为 ( G )（同样是二维或三维张量，每个像素点对应一个类别标签，通常为0或1）。对于二分类问题，Dice Loss的一般形式为：
+
+```math
+DiceLoss =  1 - \frac{2|P \cap G|}{|P| + |G|}
+```
+其中 |P∩G| 表示预测结果与真实标签交集的像素数量，，|P|和|G|分别表示预测结果和真实标签各自的像素数量。，其中，分子的系数为2，是因为分母存在重复计算P和G之间的共同元素的原因。
+
+
+![](./imgs/v2-0d66e22c0e5f6945f3ee4cd13ff21453_180x120.png)
+
+```python
+import paddle
+import paddle.nn as nn
+
+def dice_coef(input, label):
+
+    smooth = 1 # 拉普拉斯平滑平滑dice损失并加速收敛。
+    eps = 1e-8
+    output = nn.functional.sigmoid(input)
+    intersection = (output * label).sum()
+    return (2 * intersection + smooth) / (output.sum() + label.sum() + smooth + eps)
+
+if __name__ == '__main__':
+    x = paddle.to_tensor([[1.9072, 1.1079, 1.4906],[-0.6584, -0.0512, 0.7608],[-0.0614, 0.6583, 0.1095]])
+    y = paddle.to_tensor([[0,1,1],[1,1,1],[0,0,0]])
+
+    dice = dice_coef(x, y)
+    print(dice)
+    dice_loss = 1-dice
+    print(dice_loss)
+```
+为了便于计算，Dice Loss通常转换为更易于梯度传播的形式：
+
+```math
+Dice Loss = 1 - \frac{2 \sum_{i} P_{i}G_{i}}{\sum_{i}(P_{i}^2 +G_{i})} 
+```
+其中，( P_{i} ) 和 ( G_{i} ) 分别表示预测结果和真实标签在第 ( i ) 个像素点上的值。
+
