@@ -197,3 +197,37 @@ Dice Loss = 1 - \frac{2 \sum_{i} P_{i}G_{i}}{\sum_{i}(P_{i}^2 +G_{i})}
 ```
 其中，( P_{i} ) 和 ( G_{i} ) 分别表示预测结果和真实标签在第 ( i ) 个像素点上的值。
 
+#### 模型训练
+
+```
+python tools/train.py  --config configs/unet/unet_drive_128x128_40k_copy.yml  --do_eval
+```
+
+#### 模型评估
+
+```
+python tools/val.py \
+       --config configs/unet/unet_drive_128x128_40k_copy.yml \
+       --model_path output/best_model/model.pdparams
+```
+
+```
+2025-02-24 10:31:28 [INFO]      Start evaluating (total_samples: 20, total_iters: 20)...
+20/20 [==============================] - 12s 614ms/step - batch_cost: 0.6126 - reader cost: 0.3249
+2025-02-24 11:07:57 [INFO]      [EVAL] #Images: 20 mIoU: 0.8180 Acc: 0.9667 Kappa: 0.7854 Dice: 0.8927 Auc_roc: 0.9553
+2025-02-24 11:08:52 [INFO]      [EVAL] Class IoU: 
+[0.9642 0.6717]
+2025-02-24 11:09:53 [INFO]      [EVAL] Class Precision: 
+[0.9789 0.8302]
+2025-02-24 11:10:12 [INFO]      [EVAL] Class Recall: 
+[0.9847 0.7787]   # 背景、前景
+```
+
+#### 模型预测
+
+```
+python tools/predict.py \
+       --config configs/unet/unet_drive_128x128_40k_copy.yml \
+       --model_path output/best_model/model.pdparams \
+       --image_path ./data/DRIVE/images/validation/06.png
+```
