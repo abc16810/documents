@@ -51,7 +51,7 @@ PP-YOLOE的整个网络框架如下所示，整个算法是anchor-free的，主�
 
 
 - Anchor-free： 受到FCOS算法的启发，PP-YOLOE将PP-YOLOv2的标签匹配规则替换为了anchor-free，这种改进使得模型更快但是掉了0.3%mAP。
-- Backbone和Neck： 受到YOLOv5和YOLOX等网络借鉴CSPNet带来的提升效果，作者也在backbone和neck中应用了RepResBlock。其结构如下图所示：
+- Backbone和Neck： 受到YOLOv5和YOLOX等网络借鉴CSPNet带来的提升效果，作者也在backbone和neck中应用了RepResBlock (其中激活函数为Swish)。其结构如下图所示：
 
 ![](./imgs/8d49dbbc6bf8474d88b5519e687ab644.png)
 
@@ -59,6 +59,37 @@ PP-YOLOE的整个网络框架如下所示，整个算法是anchor-free的，主�
 图(a)是TreeNet中的TreeBlock结构，图(b)是本文中RepResBlock在训练阶段的结构，图©是RepResBlock在推理阶段的结构，即该模块被重参数化后的样子，这来源于RepVGG，图(d)是CSPRepResStage的结构,将CSP与RepResBlock结合就是CSPRepResStage,作者将其应用在Backbone中，neck部分是RepResBlock和CSPRepResStage混合用的。 除此之外，作者根据网络宽度和深度设置不同比例得到不同规模的网络结构s/m/l/x，如下表：
 
 ![](./imgs/24e2deaf357e4e6e80a19b8d08e36f17.png)
+
+**CSPRepResStage 种eSE模块**
+
+EffectiveSELayer （Effective Squeeze-Excitation） 有效挤压增强
+
+Effective Squeeze-Excitation（eSE）是一种改进的通道注意力模块，旨在减少计算复杂性和信息丢失。eSE基于原始的Squeeze-Excitation（SE）模块，但通过一些关键改进来提高效率。
+
+基本原理
+SE模块的核心思想是通过建模特征图通道之间的相互依赖性来增强模型的表现。SE模块的主要步骤包括：
+
+- ?Squeeze?操作：通过全局平均池化将每个通道的空间信息压缩成一个值，获得一个包含所有通道全局信息的特征向量。
+- ?Excitation?操作：通过两个全连接层来预测每个通道的重要性权重，并通过ReLU激活函数和Sigmoid激活函数得到每个通道的权重，这些权重反映了通道的重要性?
+
+
+eSE的主要改进在于减少计算复杂性和信息丢失：
+
+- ?单层全连接层?：eSE使用一个全连接层代替SE模块中的两个全连接层，从而减少了计算复杂性和信息丢失?
+- ?残差连接?：在VoVNetV2骨干网络中，eSE通过残差连接缓解了大网络的优化问题?
+
+```
+    def __init__(self, channels, act='hardsigmoid'):
+        super(EffectiveSELayer, self).__init__()
+        self.fc = nn.Conv2D(channels, channels, kernel_size=1, padding=0)
+        self.act = get_act_fn(act) if act is None or isinstance(act, (
+            str, dict)) else act
+
+    def forward(self, x):
+        x_se = x.mean((2, 3), keepdim=True)  # adaptive_avg_pool = paddle.nn.AdaptiveAvgPool2D(output_size=1)全局池化
+        x_se = self.fc(x_se)  # 全连接 即每个通道的权重
+        return x * self.act(x_se) # 每个通道的值，乘以对应的权重
+```
 
 
 
