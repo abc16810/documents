@@ -192,7 +192,35 @@ Focal loss定义:
 ![](./imgs/微信截图_20240719082321.png)
 
 
+基于注意的尺度内特征交互（AIFI，Attention-based Intra-scale Feature Interaction，基于注意力的尺度内特征交互）:只在`$S_5$`内进行尺度内交互，可以进一步降低计算成本，将自注意力机制应用于捕捉到实体间联系的高级特征，有助于后续模块对实体的定位和识别。对缺乏语义的低级特征和高级特征的之间的尺度交互式完全没有必要的。这方法不仅能够提高计算速度，还能提高ap
 
+
+1、位置编码增强
+
+```math
+X_{pe} = X + PositionalEncoding(H,W)
+```
+
+2、自注意力计算
+
+```math
+\begin{aligned}
+Q &= X_{pe}W_q, \quad K = X_{pe}W_k, \quad V = X_{pe}W_v \\
+\text{Attention} &= \text{Softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
+\end{aligned}
+```
+3、Add & Layer normalization
+
+```math
+X = LayerNorm(X + dropout(Attention))
+```
+
+4、特征增强
+
+```math
+X_{out} = LayerNorm(X+FFN(X))
+```
+> https://www.cnblogs.com/qian-li-xju/articles/18448554
 
 #### pp-human
 
