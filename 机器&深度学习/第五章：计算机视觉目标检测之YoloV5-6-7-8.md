@@ -124,7 +124,7 @@ python tools/anchor_cluster.py -c configs/ppyolo/ppyolo.yml -n 9 -s 608 -m v2 -i
 
 **匹配策略**
 
-无论网络是 Anchor-based 还是 Anchor-free，我们统一使用 prior 称呼 Anchor
+无论网络是 Anchor-based 还是 Anchor-free，**我们统一使用 prior 称呼 Anchor**
 
 
 正样本匹配包含以下两步：
@@ -134,13 +134,13 @@ python tools/anchor_cluster.py -c configs/ppyolo/ppyolo.yml -n 9 -s 608 -m v2 -i
   将 GT Bbox 的 WH 与 Prior 的 WH 进行“比例”比较。
 
   ```math
-  \begin{split}r_w = w\_{gt} / w\_{pt}     
-  r_h = h\_{gt} / h\_{pt}    
-  r_w^{max}=max(r_w, 1/r_w)   
-  r_h^{max}=max(r_h, 1/r_h)   
-  r^{max}=max(r_w^{max}, r_h^{max})   
-  if\ \ r_{max} < prior\_match\_thr:   match!\end{split}
-  ```
+  r_w = w_{gt} / w_{pt} \\
+  r_h = h_{gt} / h_{pt}  \\
+  r_w^{max}=max(r_w, 1/r_w)  \\
+  r_h^{max}=max(r_h, 1/r_h)  \\
+  r^{max}=max(r_w^{max}, r_h^{max})  \\
+  if  r_{max} < prior-match-thr:   match!
+  ``` 
 
   此处我们用一个 GT Bbox 与 P3 特征图的 Prior 进行匹配的案例进行讲解和图示：
 
