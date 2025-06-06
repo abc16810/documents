@@ -129,21 +129,56 @@ python tools/anchor_cluster.py -c configs/ppyolo/ppyolo.yml -n 9 -s 608 -m v2 -i
 
 正样本匹配包含以下两步：
 
-- “比例”比较
+- **“比例”比较**
 
-  将 GT Bbox 的 WH 与 Prior 的 WH 进行“比例”比较。
+将 GT Bbox 的 WH 与 Prior 的 WH 进行“比例”比较。
 
-  ```math
-  r_w = w_{gt} / w_{pt} \\
-  r_h = h_{gt} / h_{pt}  \\
-  r_w^{max}=max(r_w, 1/r_w)  \\
-  r_h^{max}=max(r_h, 1/r_h)  \\
-  r^{max}=max(r_w^{max}, r_h^{max})  \\
-  if  r_{max} < prior-match-thr:   match!
-  ``` 
+```math
+r_w = w_{gt} / w_{pt} \\
+r_h = h_{gt} / h_{pt}  \\
+r_w^{max}=max(r_w, 1/r_w)  \\
+r_h^{max}=max(r_h, 1/r_h)  \\
+r^{max}=max(r_w^{max}, r_h^{max})  \\
+if  r_{max} < prior-match-thr:   match!
+``` 
 
-  此处我们用一个 GT Bbox 与 P3 特征图的 Prior 进行匹配的案例进行讲解和图示：
+此处我们用一个 GT Bbox 与 P3 特征图的 Prior 进行匹配的案例进行讲解和图示：
 
-  ![](./imgs/190547195-60d6cd7a-b12a-4c6f-9cc8-13f48c8ab1e0.png)
+![](./imgs/190547195-60d6cd7a-b12a-4c6f-9cc8-13f48c8ab1e0.png)
 
-  prior1 匹配失败的原因是 $h\_{gt}\ /\ h\_{prior}\ =\ 4.8\ >\ prior\_match\_thr$
+prior1 匹配失败的原因是 $h\_{gt}\ /\ h\_{prior}\ =\ 4.8\ >\ priormatchthr$
+
+- **为步骤 1 中 match 的 GT 分配对应的正样本**
+
+依然沿用上面的例子：
+
+GT Bbox (cx, cy, w, h) 值为 (26, 37, 36, 24)，
+
+Prior WH 值为 [(15, 5), (24, 16), (16, 24)]，在 P3 特征图上，stride 为 8。通过计算，prior2 和 prior3 能够 match。
+
+计算过程如下：
+
+将 GT Bbox 的中心点坐标对应到 P3 的 grid 上
+
+```math
+GT_x^{center\_grid}=26/8=3.25  
+```
+```math
+GT_y^{center\_grid}=37/8=4.625
+```
+
+![](./imgs/190549304-020ec19e-6d54-4d40-8f43-f78b8d6948aa.png)
+
+
+将 GT Bbox 中心点所在的 grid 分成四个象限，由于中心点落在了左下角的象限当中，那么会将物体的左、下两个 grid 也认为是正样本
+
+![](./imgs/190549310-e5da53e3-eae3-4085-bd0a-1843ac8ca653.png)
+
+下图展示中心点落到不同位置时的正样本分配情况：
+
+![](./imgs/190549613-eb47e70a-a2c1-4729-9fb7-f5ce7007842b.png)
+
+那么 YOLOv5 的 Assign 方式具体带来了哪些改进？
+- 一个 GT Bbox 能够匹配多个 Prior
+- 一个 GT Bbox 和一个Prior 匹配时，能分配 1-3 个正样本
+- 以上策略能适度缓解目标检测中常见的正负样本不均衡问题。
