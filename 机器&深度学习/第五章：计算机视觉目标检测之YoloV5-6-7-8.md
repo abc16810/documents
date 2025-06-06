@@ -1,5 +1,5 @@
 
-#### Yolov5
+#### Yolov5 （2021）
 
 **数据处理**
 
@@ -21,17 +21,29 @@
             [116, 90], [156, 198], [373, 326]]
 ```
 
+**SiLU 激活函数**
+
+‌SiLU（Sigmoid Linear Unit）激活函数是一种结合了Sigmoid和线性变换的平滑非线性函数，其公式为SiLU(x)=x⋅σ(x)，其中σ(x)是Sigmoid函数。‌它被广泛应用于深度学习模型（如YOLOv5）中，因其平滑性、可微性和对负值的非零响应优于ReLU等传统激活函数
+
 
 **架构图**
 
+YOLOv5-P5模型: 3个输出层P3， P4， P5在步长(缩放倍数)8,16,32。输入尺寸为640
 
-![](./imgs/2844c8dc5159dcce38bd21192671d5a3.png)
+![](./imgs/200000324-70ae078f-cea7-4189-8baa-440656797dad.jpg)
+<center>图 1：YOLOv5-l-P5 模型结构</center> 
+<br>
+
+YOLOv5-P6大尺度模型：4个输出层P3、P4、P5、P6，步长8,16,32,64。输入尺寸为1280
+
+![](./imgs/211143533-1725c1b2-6189-4c3a-a046-ad968e03cb9d.jpg)
+<p align="center">图 2：YOLOv5-l-P6 模型结构</p> 
 
 
 
+![](./imgs/v2-ff8d2fd62484923f1cbc53605d3c7156_r.png)
 
 **backbone**
 主干网络 CSPDarkNet (Conv、C3、SPPF) 输入[4, 3, 640, 640] 返回其特征映射的阶段的索引 [2, 3, 4]
-在最新的YOLOv5中，使用stem Conv和SPPF(快速，只有单个spp内核大小)
+在最新的YOLOv5中，使用stem Conv和SPPF(快速PPF。只有单个spp内核大小)
 
-![](./imgs/fb1bd0e1b5e8bca3bbfebcfe0af5a9a8.png)
