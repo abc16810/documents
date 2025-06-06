@@ -134,11 +134,11 @@ python tools/anchor_cluster.py -c configs/ppyolo/ppyolo.yml -n 9 -s 608 -m v2 -i
   将 GT Bbox 的 WH 与 Prior 的 WH 进行“比例”比较。
 
   ```math
-  \begin{split}r_w = w\_{gt} / w\_{pt}    \\
-  r_h = h\_{gt} / h\_{pt}    \\
-  r_w^{max}=max(r_w, 1/r_w)  \\
-  r_h^{max}=max(r_h, 1/r_h)  \\
-  r^{max}=max(r_w^{max}, r_h^{max})   \\
+  \begin{split}r_w = w\_{gt} / w\_{pt}     
+  r_h = h\_{gt} / h\_{pt}    
+  r_w^{max}=max(r_w, 1/r_w)   
+  r_h^{max}=max(r_h, 1/r_h)   
+  r^{max}=max(r_w^{max}, r_h^{max})   
   if\ \ r_{max} < prior\_match\_thr:   match!\end{split}
   ```
 
