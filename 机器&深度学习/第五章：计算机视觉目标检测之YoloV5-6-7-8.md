@@ -145,6 +145,7 @@ b_y=(2\cdot\sigma(t_y)-0.5)+c_y   \\
 b_w=a_w\cdot(2\cdot\sigma(t_w))^2   \\
 b_h=a_h\cdot(2\cdot\sigma(t_h))^2\end{split}
 ```
+
 改进之处主要有以下两点
 - 中心点坐标范围从 (0, 1) 调整至 (-0.5, 1.5)
 - 宽高范围从 $(0，+\infty)$  调整至 $(0，4a_{wh})$
@@ -254,8 +255,6 @@ array([[ 0. ,  0. ],
        [ 0. , -0.5]], dtype=float32)
 ```
 
-
-
 那么 YOLOv5 的 Assign 方式具体带来了哪些改进？
 - 一个 GT Bbox 能够匹配多个 Prior
 - 一个 GT Bbox 和一个Prior 匹配时，能分配 1-3 个正样本
@@ -281,6 +280,30 @@ YOLOv5 中总共包含 3 个 Loss，分别为：
 - Objectness loss：使用的是 BCE loss
 - Location loss：使用的是 CIoU loss
 
+
+BCEWithLogitsLoss (sigmoid + BCELoss)
+
+
+```
+>>> logit = paddle.to_tensor([5.0, 1.0, 3.0], dtype="float32")
+>>> label = paddle.to_tensor([1.0, 0.0, 1.0], dtype="float32")
+>>> bce_logit_loss = paddle.nn.BCEWithLogitsLoss()
+>>> output = bce_logit_loss(logit, label)
+>>> print(output)
+Tensor(shape=[], dtype=float32, place=Place(cpu), stop_gradient=True,
+0.45618808)
+# 计算过程
+s = paddle.nn.Sigmoid()
+>>> s(logit)
+Tensor(shape=[3], dtype=float32, place=Place(gpu:0), stop_gradient=True,
+   [0.99330717, 0.73105854, 0.95257413])
+o1 = 1*math.log(0.99330717) + (1-1)* ln(1-0.99330717) = -0.42159449003804794
+o2 = 0*ln(0.73105854) + (1-0)*math.log(1-0.73105854) = -1.313261543880988
+o3 = 1*math.log(0.95257413) + (1-1)* ln(1-0.95257413) = -0.04858734823797353
+out = -(o1+o2+o3) /3 = 0.45618807318093607
+```
+
+
 三个 loss 按照一定比例汇总：
 
 ```math
@@ -295,3 +318,18 @@ obj_level_weights=[4., 1., 0.4]
 ```math
 L_{obj}=4.0\cdot L_{obj}^{small}+1.0\cdot L_{obj}^{medium}+0.4\cdot L_{obj}^{large}
 ```
+
+####  yolov5u
+YOLOv5结构使用YOLOv8的head和loss，是Anchor Free的检测方案
+
+####  yolov5_seg (2022.11)
+
+yolov5_seg 是yolov5 7.0 版本的一个实例分割模型
+
+
+### yolov6(2022)
+
+官方论文:
+
+- [YOLOv6 v3.0: A Full-Scale Reloading 🔥](https://arxiv.org/abs/2301.05586)
+- [YOLOv6: A Single-Stage Object Detection Framework for Industrial Applications](https://arxiv.org/abs/2209.02976)
