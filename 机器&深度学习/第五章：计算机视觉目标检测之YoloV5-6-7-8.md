@@ -21,9 +21,9 @@
 在网络训练中，网络在初始锚框的基础上输出预测框，进而和真实框groundtruth进行比对，计算两者差距，再反向更新，迭代网络参数。
 
 ```
-  anchors: [[10, 13], [16, 30], [33, 23],
-            [30, 61], [62, 45], [59, 119],
-            [116, 90], [156, 198], [373, 326]]  # w,h
+  anchors: [[10, 13], [16, 30], [33, 23],   #  P3/8
+            [30, 61], [62, 45], [59, 119],   # P4/16
+            [116, 90], [156, 198], [373, 326]]  # P5/32  w,h
 ```
 
 **SiLU 激活函数**
@@ -122,6 +122,45 @@ python tools/anchor_cluster.py -c configs/ppyolo/ppyolo.yml -n 9 -s 608 -m v2 -i
 |  -m/--method  |  使用的Anchor聚类方法  |  v2  |  目前只支持yolov2的聚类算法  |
 |  -i/--iters  |  kmeans聚类算法的迭代次数  |  1000  | kmeans算法收敛或者达到迭代次数后终止 |
 
+**Bbox 编解码过程**
+
+在 Anchor-based 算法中，预测框通常会基于 Anchor 进行变换，然后预测变换量，这对应 GT Bbox 编码过程，而在预测后需要进行 Pred Bbox 解码，还原为真实尺度的 Bbox，这对应 Pred Bbox 解码过程。
+
+在 YOLOv3 中，回归公式为:
+
+```math
+\begin{split}b_x=\sigma(t_x)+c_x  \\
+b_y=\sigma(t_y)+c_y  \\
+b_w=a_w\cdot e^{t_w} \\
+b_h=a_h\cdot e^{t_h} \\\end{split}
+```
+
+> $a_w$ 代表 Anchor 的宽度, $c_x$ 代表 Grid 所处的坐标, $\sigma$ 代表 Sigmoid 公式。
+
+而在 YOLOv5 中，回归公式为:
+
+```math
+\begin{split}b_x=(2\cdot\sigma(t_x)-0.5)+c_x   \\
+b_y=(2\cdot\sigma(t_y)-0.5)+c_y   \\
+b_w=a_w\cdot(2\cdot\sigma(t_w))^2   \\
+b_h=a_h\cdot(2\cdot\sigma(t_h))^2\end{split}
+```
+改进之处主要有以下两点
+- 中心点坐标范围从 (0, 1) 调整至 (-0.5, 1.5)
+- 宽高范围从 $(0，+\infty)$  调整至 $(0，4a_{wh})$
+
+这个改进具有以下好处：
+
+新的中心点设置能更好的预测到 0 和 1。这有助于更精准回归出 box 坐标
+
+![](./imgs/190546778-83001bac-4e71-4b9a-8de8-bd41146495af.png)
+
+
+宽高回归公式中 exp(x) 是无界的，这会导致梯度失去控制，造成训练不稳定。YOLOv5 中改进后的宽高回归公式优化了此问题。
+
+![](./imgs/190546793-5364d6d3-7891-4af3-98e3-9f06970f3163.png)
+
+
 **匹配策略**
 
 无论网络是 Anchor-based 还是 Anchor-free，**我们统一使用 prior 称呼 Anchor**
@@ -178,7 +217,81 @@ GT_y^{center\_grid}=37/8=4.625
 
 ![](./imgs/190549613-eb47e70a-a2c1-4729-9fb7-f5ce7007842b.png)
 
+```
+    ...
+    gxy = t[:, 2:4]  # grid xy
+    gxi = gain[[2, 3]] - gxy  # inverse
+    # j 表示x小于0.5 gt样本左边grid可以选择为正样本（pos）
+    # k 表示小于0.5，gt样本上边grid可以选择为正样本（pos）
+    j, k = ((gxy % 1 < g) & (gxy > 1)).T  
+    # 反转后的坐标
+    # l 表示gt样本右边grid可以选择为正样本（pos）
+    # m 表示gt样本下边grid可以选择为正样本（pos）
+    l, m = ((gxi % 1 < g) & (gxi > 1)).T
+    # gt bbox 所在的中心、及选取的左、上、右、下 grid 
+    j = np.stack((np.ones_like(j), j, k, l, m))
+    t = np.tile(t, [5, 1, 1])[j]
+    offsets = (np.zeros_like(gxy)[None] + self.off[:, None])[j]
+  else:
+    t = targets_labels[0]
+    offsets = 0  
+
+  # Define
+  b, c = t[:, :2].astype(np.int64).T  # image, class
+  gxy = t[:, 2:4]  # grid xy
+  gwh = t[:, 4:6]  # grid wh
+  gij = (gxy - offsets).astype(np.int64)
+  gi, gj = gij.T  # grid xy indices
+
+
+
+
+# self.off  偏移量
+array([[ 0. ,  0. ],
+       [ 0.5,  0. ],
+       [ 0. ,  0.5],
+       [-0.5,  0. ],
+       [ 0. , -0.5]], dtype=float32)
+```
+
+
+
 那么 YOLOv5 的 Assign 方式具体带来了哪些改进？
 - 一个 GT Bbox 能够匹配多个 Prior
 - 一个 GT Bbox 和一个Prior 匹配时，能分配 1-3 个正样本
 - 以上策略能适度缓解目标检测中常见的正负样本不均衡问题。
+
+
+而 YOLOv5 中的回归方式，和 Assign 方式是相互呼应的：
+
+1、中心点回归方式
+
+![](./imgs/190549684-21776c33-9ef8-4818-9530-14f750a18d63.png)
+
+2、WH 回归方式：
+
+![](./imgs/190549696-3da08c06-753a-4108-be47-64495ea480f2.png)
+
+
+#### loss
+
+YOLOv5 中总共包含 3 个 Loss，分别为：
+
+- Classes loss：使用的是 BCE loss
+- Objectness loss：使用的是 BCE loss
+- Location loss：使用的是 CIoU loss
+
+三个 loss 按照一定比例汇总：
+
+```math
+Loss=\lambda_1L_{cls}+\lambda_2L_{obj}+\lambda_3L_{loc}
+```
+
+P3、P4、P5 层对应的 Objectness loss 按照不同权重进行相加，默认的设置是
+```
+obj_level_weights=[4., 1., 0.4]
+```
+
+```math
+L_{obj}=4.0\cdot L_{obj}^{small}+1.0\cdot L_{obj}^{medium}+0.4\cdot L_{obj}^{large}
+```
