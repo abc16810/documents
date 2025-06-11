@@ -344,6 +344,14 @@ YOLOv6 是美团视觉智能部研发的一款目标检测框架，致力于工�
 - 在Backbone方面，YOLOv6在小规模模型（n/t/s模型）采用RepBlock进行构建(EfficientRep)；对于大规模模型（m/l模型）采用CSPStackRepBlock进行构建；
 - 在Neck方面，YOLOv6延续了YOLOv4与YOLOv5的设计思想，依旧使用的是PAN-FPN架构，同时采用RepBlock（n/t/s模型）与CSPStackRepBlock（m/l模型）并相应调整宽度和深度。YOLOv6 的颈部被称为 Rep-PAN。
 - 在Head方面，对Decoupled Head进行改进，最终使用Efficient Decouple Head；
+- YOLOv6 l 模型默认激活函数为silu(Conv 与 SiLU 在精度上表现最佳)，其余 n s m 模型则默认为relu(RepConv 与 ReLU 的组合实现了更好的权衡)。我们选择在 YOLOv6-N/T/S/M 中使用 RepConv/ReLU 组合以获得更高的推理速度，并在大型模型 YOLOv6-L 中使用 Conv/SiLU 组合以加速训练并提升性能
+- YOLOv6 n t模型训练默认使用siou loss，其余s m l模型则默认使用giou loss
+
+![](./imgs/20250611113816.png)
+
+> (a) RepBlock 由带有 ReLU 激活的 RepVGG 块堆叠组成。
+> (b) 在推理时，RepVGG 块转换为 RepConv。
+> (c) CSPStackRep Block 包含三个 1 × 1 卷积层，以及 ReLU 激活后的双 RepConv 子块堆叠，并带有残差连接
 
 
 **YOLOv6 v3.0的主要贡献简述如下**
