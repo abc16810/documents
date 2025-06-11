@@ -333,17 +333,26 @@ YOLOv6 是美团视觉智能部研发的一款目标检测框架，致力于工�
 
 官方论文:
 
-- [YOLOv6 v3.0: A Full-Scale Reloading 🔥](https://arxiv.org/abs/2301.05586)
+- [YOLOv6 v3.0: A Full-Scale Reloading （2023） 🔥](https://arxiv.org/abs/2301.05586)
 - [YOLOv6: A Single-Stage Object Detection Framework for Industrial Applications](https://arxiv.org/abs/2209.02976)
 
-![](./imgs/x2.png)
 
-YOLOv6 v3.0的主要贡献简述如下
+**骨干网络**
+
+![](./imgs/yolov6_x2.png)
+> YOLOv6 框架（显示了 N 和 S）。对于 M/L，RepBlocks 被替换为 CSPStackRep
+- 在Backbone方面，YOLOv6在小规模模型（n/t/s模型）采用RepBlock进行构建(EfficientRep)；对于大规模模型（m/l模型）采用CSPStackRepBlock进行构建；
+- 在Neck方面，YOLOv6延续了YOLOv4与YOLOv5的设计思想，依旧使用的是PAN-FPN架构，同时采用RepBlock（n/t/s模型）与CSPStackRepBlock（m/l模型）并相应调整宽度和深度。YOLOv6 的颈部被称为 Rep-PAN。
+- 在Head方面，对Decoupled Head进行改进，最终使用Efficient Decouple Head；
+
+
+**YOLOv6 v3.0的主要贡献简述如下**
 - 对检测器的Neck部件进行了翻新：引入BiC(Bi-directional Concatenation)提供更精确的定位信息；将SPPF简化为SimCSPSPPF，牺牲较少的速度提升更多的性能
 - 提出一种AAT(Anchor-aided training)策略，在不影响推理效率的情况下同时受益于Anchor-basedAnchor-free设计理念。
 - 对YOLOv6的Backbone与Neck进行加深，在更高分辨率输入下达成新的SOTA性能
 - 提出一种新的自蒸馏策略提升YOLOv6小模型的性能，训练阶段采用更大的DFL作为增强版辅助回归分支。
 
+![](./imgs/x2.png)
 ![](./imgs/yolov6_x3.png)
 
 > (a) YOLOv6 的颈部结构（N 和 S 所示）。注意对于 M/L，RepBlocks 被替换为 CSPStackRep
@@ -403,7 +412,5 @@ L_{total} = L_{det} + \alpha L_{KD}
 ![](./imgs/a_1.png)
 
 > 其中 $E_i$ 表示当前训练的轮次， $E_{max}$ 代表最大训练轮次
-
-
 
 由于DFL会对回归分支引入额外的参数，极大程度影响小模型的推理速度。因此，作者针对小模型设计了一种DLD(Decoupled Localization Distillation)以提升性能且不影响推理速度。具体来说，在小模型中插入一个增强版回归分支作为辅助。在自蒸馏阶段，小模型受普通回归分支与增强回归分支加持，老师模型近使用辅助分支。需要注意：普通分支仅采用硬标签进行训练，而辅助分支则用硬标签与源自老师模型的软标签进行训练。完成蒸馏后，仅普通分支保留，辅助分支被移除。这种训练策略又是一种加量不加价的"赠品"。
