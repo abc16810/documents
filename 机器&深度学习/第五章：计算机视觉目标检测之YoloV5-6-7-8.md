@@ -385,8 +385,23 @@ TOOD 的另一个主要贡献是关于任务对齐头（T-head）。T-head 堆�
 此外，我们观察到 TAL 能够比 SimOTA 带来更多的性能提升，并稳定训练。因此，我们在 YOLOv6 中采用 TAL 作为默认的标签分配策略
 
 此外，TOOD [ 5] 的实现采用 ATSS [ 51] 作为早期训练 epoch 中的预热标签分配策略。我们也保留了预热策略，并对其进行了进一步的探索。
+```math
+t = s^{\alpha} \times u^{\beta} 
+```
+> s 是分类得分，u是定位精度iou （pred_bboxes与gt_bboxes）
+>  $\alpha$ 和 $\beta$ 为权重超参
 
-
+- 计算所有pred bbox（所有金字塔级别的bbox）和gt之间的对齐度量（alignment metric）
+    ```
+    alpha: 1.0
+    beta: 6.0
+    # compute alignment metrics, [B, n, L]
+    alignment_metrics = bbox_cls_scores.pow(self.alpha) * ious.pow(
+            self.beta)
+    ```
+- 选择top-k alignment metrics bbox作为每个gt的候选项
+- 将阳性样品的中心（anchor_points）限制在gt bbox中（因为无锚检测器）只能预测正距离)
+- 如果一个锚框被分配给多个gts，则具有最高的分数将被选中。
 
 **VFL Loss 分类损失函数**
 
@@ -511,3 +526,19 @@ L_{total} = L_{det} + \alpha L_{KD}
 > 其中 $E_i$ 表示当前训练的轮次， $E_{max}$ 代表最大训练轮次
 
 由于DFL会对回归分支引入额外的参数，极大程度影响小模型的推理速度。因此，作者针对小模型设计了一种DLD(Decoupled Localization Distillation)以提升性能且不影响推理速度。具体来说，在小模型中插入一个增强版回归分支作为辅助。在自蒸馏阶段，小模型受普通回归分支与增强回归分支加持，老师模型近使用辅助分支。需要注意：普通分支仅采用硬标签进行训练，而辅助分支则用硬标签与源自老师模型的软标签进行训练。完成蒸馏后，仅普通分支保留，辅助分支被移除。这种训练策略又是一种加量不加价的"赠品"。
+
+
+
+### yolov7（2022）
+
+YOLOV7 是 YOLOV4 的原班人马于 2022 年提出的最新的 YOLO 版本。 YOLOv7 的在速度和精度上的表现也优于 YOLOR、YOLOX、Scaled-YOLOv4、YOLOv5、DETR 等多种目标检测器
+
+![](./imgs/78f12a93ddae30aa52221b4fecc37208.jpg)
+
+
+**YOLOV7 整体网络结构**
+YOLOV7 跟 V4、V5 的结构差不多，依然是 Backbone+Neck+Head
+
+![](./imgs/c4b4ca6c334d1f45ea3c052fa0d79d3e.png)
+
+在 Backbone 中，输入的图像会先经过 4 个普通卷积 CBS (Conv2D+BatchNorm+SiLu)，这 4 个 CBS 都是 3*3 的卷积核，它们的不同在于橙色的 CBS 步长为 1，不会改变特征图的尺寸；而褐色的 CBS 步长为 2，会进行下采样；YOLOV5 只有两个普通卷积 CBS
