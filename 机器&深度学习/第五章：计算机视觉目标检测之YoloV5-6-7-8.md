@@ -531,6 +531,9 @@ L_{total} = L_{det} + \alpha L_{KD}
 
 ### yolov7（2022）
 
+Trainable bag-of-freebies sets new state-of-the-art for real-time object detectors
+
+
 YOLOV7 是 YOLOV4 的原班人马于 2022 年提出的最新的 YOLO 版本。 YOLOv7 的在速度和精度上的表现也优于 YOLOR、YOLOX、Scaled-YOLOv4、YOLOv5、DETR 等多种目标检测器
 
 ![](./imgs/78f12a93ddae30aa52221b4fecc37208.jpg)
@@ -542,3 +545,38 @@ YOLOV7 跟 V4、V5 的结构差不多，依然是 Backbone+Neck+Head
 ![](./imgs/c4b4ca6c334d1f45ea3c052fa0d79d3e.png)
 
 在 Backbone 中，输入的图像会先经过 4 个普通卷积 CBS (Conv2D+BatchNorm+SiLu)，这 4 个 CBS 都是 3*3 的卷积核，它们的不同在于橙色的 CBS 步长为 1，不会改变特征图的尺寸；而褐色的 CBS 步长为 2，会进行下采样；YOLOV5 只有两个普通卷积 CBS
+
+#### ELAN
+YOLOV5 在进一步的 Backbone 中使用的是 CSPLayer（C3） 结构，V7 中改成了 ELAN 结构 + MP 结构
+
+扩展高效层聚合网络(efficient layer aggregation networks,ELAN) ELAN 结构
+
+![](./imgs/6214fa2ec5eccf514d246f506749722b.png)
+
+![](./imgs/20250616171133.png)
+
+> Extended efficient layer aggregation networks, E-ELAN
+
+通过控制最短最长的梯度路径，更深的网络可以有效地学习和收敛。ELAN 由多个 CBS 构成，其输入输出特征大小保持不变，通道数在开始的两个 CBS 会有变化， 后面的几个输入通道都是和输出通道保持一致的，经过最后一个 CBS 输出为需要的通道。上图中粉色的 CBS 是 1*1 的卷积核，橙色的 CBS 是 3*3 的卷积核。经过 concat 输出的是 2c。
+
+#### MP-1 结构
+
+![](./imgs/03bcf1dd5339d6db561b0a63b26df1e5.png)
+
+这里就是使用了最大池化 (上层) 和步长为 2 的 CBS (下层) 同时进行降采样，通道数通过 concat 合并后 MP1 前后保持不变
+
+
+YOLOv7 的 W6、E6、D6 和 E6E 模型是官方发布的一系列高性能变体，专门针对高分辨率输入（1280x1280）设计。这些模型在原始 YOLOv7 基础上进行了深度和宽度的扩展，显著提升了检测精度。
+
+
+模型架构对比
+模型|	参数量|	GFLOPs|	层级深度|	特征金字塔|	适用场景
+---|---|---|---|---|---
+W6|	≈70M|	180|	中等|	P3-P8|	通用高精度
+E6|	≈97M|	250|	最深|	P3-P8|	服务器端/最高精度
+D6|	≈80M|	210|	较深|	P3-P8|	精度-速度平衡
+E6E|	≈115M|	300|	最深|	P3-P8|	极限精度/研究
+
+> 所有模型均支持 1280x1280 输入分辨率，使用 6 级特征金字塔（P3-P8）
+
+
