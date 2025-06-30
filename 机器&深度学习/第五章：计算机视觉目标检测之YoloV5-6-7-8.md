@@ -600,6 +600,98 @@ YOLOV7 的 Head 部分也是三个检测头，对不同尺度的特征图进行�
 
 REP 在部署和训练的时候结构不同。在训练的时候，如果输入输出通道数相同，则包含了第三层 BN 的直连通道，否则只有第一层的 1*1 卷积 + BN 以及第二层的 3*3 卷积 + BN，上面虽然画的是 CBS，但其实这里是没有激活函数 SiLu 的，只有三层相加才会被最后激活。在部署时，为了方便部署，会将分支的参数重参数化到主分支上，取 3*3 的主分支卷积输出，但这里是没有 BN 的，只有激活。所以上面这个图是存在歧义的，需要指出
 
+#### 辅助训练模块(aux)
+
+深度监督是一种常用于训练深度网络的技术，其主要概念是在网络的中间层增加额外的辅助头，以及在辅助损失为指导的浅层网络权重。即使对于像 ResNet 和 DenseNet 这样收敛效果好的网络结构，深度监督仍然可以显著提高模型在许多任务上的性能。
+
+深度监督 (Deep Supervision) 又称为中继监督 (intermediate supervision），就是在深度神经网络的某些中间隐藏层加了一个辅助的分类器作为一种网络分支来对主干网络进行监督的技巧，其实就是在网络的中间部分添加了额外的 loss，跟多任务是有区别的，多任务有不同的 ground truth 计算不同的 loss，而深度监督的 ground truth 都是同一个 ground truth，不同位置的 loss 按系数求和。深度监督的目的是为了浅层能够得到更加充分的训练，解决深度神经网络训练梯度消失和收敛速度过慢等问题。
+
+无论辅助head或lead head的情况如何，都需要针对目标进行深度监督训练。在开发软标签分配器相关技术的过程中，我们意外发现了一个新的衍生问题，即"如何将软标签分配给辅助head和lead head？"据我们所知，到目前为止，相关文献尚未探讨这一问题。目前最流行方法的结果如Fig5(c)所示，即分离辅助head和lead head，，然后使用它们各自的预测结果和gt来执行标签分配。本文所提方法是一种新的标签分配方法，通过lead head预测来指导辅助head和lead head。换句话说，我们使用lead head预测作为指导来生成从粗到细的分层标签，这些标签分别用于辅助head和lead head学习。Fig5(d)和(e)分别显示了两种所提深度监督标签分配策略。
+
+![](./imgs/20250623100725.png)
+
+上图中 a 是常见的目标检测网络结构，不包含深度监督。b 是包含了深度监督的目标检测器架构，这里最终输出的头称为引导头，用于辅助训练的头称为辅助头。在标签分配的问题中，过去在深度网络的训练中，标签分配通常直接指的是 ground truth，并根据指定的规则生成 hard label。近年来，研究者经常利用网络预测的质量分布来结合 ground truth，使用一些计算和优化方法来生成可靠的软标签 (soft label)。在本文中，作者将网络预测结果与 ground truth 一起考虑后再分配软标签的机制称为 "标签分配器"。无论辅助头或引导头，都需要对目标进行深度监督。进行软标签分配的方法如上图中 c 所示，将辅助头和引导头分离，然后利用它们各自的预测结果和 ground truth 执行标签分配。通过引导头的预测来引导辅助头以及自身。换句话说，首先使用引导头的 prediction 作为指导，生成从粗到细的层次标签，分别作用于辅助头和引导头的学习。
+
+
+Coarse-to-fine lead guided label assigner (粗到细引导标签分配器):Coarse-to-fine 引导头使用到了自身的 prediction 和 ground truth 来生成软标签，引导标签进行分配。然而在这个过程中，作者生成了两组不同的软标签，即粗标签和细标签。其中细标签与引导头在标签分配器上生成的软标签相同，粗标签是通过降低正样本分配的约束，允许更多的网络作为正目标。原因是一个辅助头的学习能力并不需要强大的引导头，为了避免丢失信息，作者将专注于优化样本召回的辅助头。对于引导头的输出，可以从查准率中过滤出高精度值的结果作为最终输出。然而，值得注意的是，如果粗标签的附加权值接近细标签的附加权值，则可能会在最终预测时产生错误的先验结果
+
+#### dynamic k estimation
+
+每个GT应该分配多少个对应的positive anchors呢？YOLOV8采用的分配策略会为每个GT分配固定个数的positive anchors，但直观上为每个GT分配的positive anchors数目应该是不一样的。每个GT分配的情况可能会根据目标的大小、遮蔽情況而有所不同，如何动态決定这个数值呢？可以使用dynamic k estimation的方法
+
+
+首先，需要算出每个GT与每个anchor的IOU值，得出一个pairwise IOU矩阵；随后，需要將top-q个最大的IOU值加起來，再取整作为每个GT应该分配的anchor个数。
+
+如下面的例子，top-q=10；不足10的部分则全部取：
+
+![](./imgs/v2-a1237e46d7ec1028c93f4213b7c9887d_1440w.jpg)
+
+由与s的和必須和d的和一致，故不足的部分会用background代替，成本可以表示为和背景的损失函數，最后依然套用Sinkhorn-Knopp算法求解：
+
+![](./imgs/v2-ab14d1eaba9fd5679ff3288cb8c5a8c7_1440w.jpg)
+
+#### simOTA方法
+
+Sinkhorn-Knopp算法增加了25%的花銷，为了节省时间，提取了simOTA算法，得到了类似效果。主要思想如下：
+
+1、为每个GT选择dynamic k个成本最小的positive anchors;
+
+![](./imgs/v2-e43c73da778be4dd65470c5558f5eebc_1440w.jpg)
+
+2、一旦发生ambiguous anchors的问题，则只会保留最小的cost：
+
+![](./imgs/v2-403533ec244b2f9dec2408fc16d27c8d_1440w.jpg)
+
+
+
+1、拆分head_outs输出从[b,c,h,w]到[b,na,c//na,h,w]
+
+```
+[8, 27, 80, 80] -> [8,3,80,80,9]
+```
+2、从gt_targets（dict）中生成targets_labels [nt,6]
+
+```
+# 第一个值是批量索引
+# 第二个值是类别
+# 第3到6是坐标(x,y,w,h)
+```
+3、构建目标
+
+```
+1、基于批量进行ancher匹配（按照yolov5的匹配方式分配对应的正样本）【b,a,gj,gi】。
+2、基于批量进行预测样本匹配 [0,1,2,...8] batch=8
+    不同的缩放级别的预测样本匹配 （8、16、32）pi[b,a,gj,gi]
+      px,py 按照中心点回归方式
+      pw,ph 回归方式
+    计算gt与pre bbox 直接的IOU 即pairwise IOU 矩阵，并计算IOU损失 pairwise_iou_loss = -paddle.log(pairwise_ious + 1e-5)
+    动态k估计 min_topk默认为10。 每个GT（每行）选择cost最小的min(min_topk, pair_wise_iou.shape[1])个anchor
+    找出应该給每个GT框分配多少个(dynamic_ks)anchors; dynamic_ks 最小必须为1
+    #（cls_preds_）求出最終的类別confidence = 预测概率 x objectness
+    # 开根号，避免值太小 cls_preds_.sqrt_() ->[0,1)
+    为了符合logits值，取sigmoid函數的逆運算: log(y / (1 - y) + 1e-5) (0,1) -> (-6.9, 6.9) 如下图
+    计算成本矩阵  cost = (pairwise_cls_loss + 3.0 * pairwise_iou_loss)
+
+    每个GT应该分配那个anchors,相应位置标记为1 （相应的cost最少）matching_matrix
+    按列求和；每列应该为1，否则ambiguous anchors，如果出现ambiguous anchors情况，找出cost最小的行设为1
+    根据正负样本标记筛选anchor
+    按照不同的输出层生成最終的标签
+   
+
+```
+
+![](./imgs/20250625171753.png)
+np.log(y/(1-y)) 图
+
+**loss**
+
+yolov7的损失函数基本上和yolov5的损失函数如出一辙：
+- class loss采用二元交叉熵
+- box loss采用CIOU LOSS
+- object loss采用IOU LOSS 作为软标签 进行BCE
+同時，box loss针对P3,P4,P5三个prediction层各自有不同的权重，也加大对小目标的检测力度。
+
+
 
 YOLOv7 的 W6、E6、D6 和 E6E 模型是官方发布的一系列高性能变体，专门针对高分辨率输入（1280x1280）设计。这些模型在原始 YOLOv7 基础上进行了深度和宽度的扩展，显著提升了检测精度。
 
@@ -614,4 +706,25 @@ E6E|	≈115M|	300|	最深|	P3-P8|	极限精度/研究
 
 > 所有模型均支持 1280x1280 输入分辨率，使用 6 级特征金字塔（P3-P8）
 
+> https://zhuanlan.zhihu.com/p/670643999
+
+### yolov8 (2023)
+
+‌YOLOv8是Ultralytics团队于2023年1月推出的目标检测模型，作为YOLO系列的最新版本，它在速度、精度和灵活性方面均有显著提升，支持目标检测、实例分割、姿态估计等多种任务
+
+YOLOv8 是一个 SOTA 模型，它建立在以前 YOLO 版本的成功基础上，并引入了新的功能和改进，以进一步提升性能和灵活性。具体创新包括一个新的骨干网络、一个新的 Ancher-Free 检测头和一个新的损失函数，可以在从 CPU 到 GPU 的各种硬件平台上运行
+
+![](./imgs/d238933c62901e9b4e06ac3b8cb22df4.jpg)
+
+YOLOv8是Ultralytics公司推出的YOLO的最新版本。作为一款尖端、最先进的（SOTA）车型，YOLOv8在之前版本的成功基础上，引入了新的功能和改进，以增强性能、灵活性和效率。YOLOv8支持全方位的视觉AI任务，包括检测、分割、姿态估计、跟踪和分类。这种多功能性允许用户在不同的应用程序和域中利用YOLOv8的功能
+
+Ultralytics为YOLO模型发布了一个全新的存储库。它被构建为 用于训练对象检测、实例分割和图像分类模型的统一框架。
+
+- 提供了一个全新的 SOTA 模型，包括 P5 640 和 P6 1280 分辨率的目标检测网络和基于 YOLACT 的实例分割模型。和 YOLOv5 一样，基于缩放系数也提供了 N/S/M/L/X 尺度的不同大小模型，用于满足不同场景需求
+- 骨干网络和 Neck 部分可能参考了 YOLOv7 ELAN 设计思想，将 YOLOv5 的 C3 结构换成了梯度流更丰富的 C2f 结构，并对不同尺度模型调整了不同的通道数，属于对模型结构精心微调，不再是无脑一套参数应用所有模型，大幅提升了模型性能。不过这个 C2f 模块中存在 Split 等操作对特定硬件部署没有之前那么友好了
+- Head 部分相比 YOLOv5 改动较大，换成了目前主流的解耦头结构，将分类和检测头分离，同时也从 Anchor-Based 换成了 Anchor-Free
+- Loss 计算方面采用了 TaskAlignedAssigner 正样本分配策略，并引入了 Distribution Focal Loss
+- 训练的数据增强部分引入了 YOLOX 中的最后 10 epoch 关闭 Mosiac 增强的操作，可以有效地提升精度
+
+YOLOv8 还高效灵活地支持多种导出格式，并且该模型可以在 CPU 和 GPU 上运行。YOLOv8 模型的每个类别中有五个模型用于检测、分割和分类。YOLOv8 Nano 是最快和最小的，而 YOLOv8 Extra Large (YOLOv8x) 是其中最准确但最慢的
 
