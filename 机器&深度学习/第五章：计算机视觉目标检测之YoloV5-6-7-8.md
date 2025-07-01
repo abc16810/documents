@@ -743,3 +743,33 @@ YOLOv8 CSPDarkNet骨干区别于YOLOv5 CSPDarkNet
 YOLOv8 使用的 YOLOv8 CSP-PAN FPN 不同于YOLOv5 CSP-PAN FPN
 - 没有横向conv
 - 使用c2player在YOLOv8而在YOLOv5中使用CSPLayer
+
+
+具体改进如下：
+
+1. Backbone：使用的依旧是CSP的思想，不过YOLOv5中的C3模块被替换成了C2f模块，实现了进一步的轻量化，同时YOLOv8依旧使用了YOLOv5等架构中使用的SPPF模块；
+2. PAN-FPN：毫无疑问YOLOv8依旧使用了PAN的思想，不过通过对比YOLOv5与YOLOv8的结构图可以看到，YOLOv8将YOLOv5中PAN-FPN上采样阶段中的卷积结构删除了，同时也将C3模块替换为了C2f模块；
+3. Decoupled-Head：是不是嗅到了不一样的味道？是的，YOLOv8走向了Decoupled-Head；
+4. Anchor-Free：YOLOv8抛弃了以往的Anchor-Base，使用了Anchor-Free的思想；
+5. 损失函数：YOLOv8使用VFL Loss作为分类损失，使用DFL Loss+CIOU Loss作为分类损失；
+6. 样本匹配：YOLOv8抛弃了以往的IOU匹配或者单边比例的分配方式，而是使用了Task-Aligned Assigner匹配方式。
+
+
+#### C3 Vs C2f
+
+![](./imgs/c3.png)
+
+针对C3模块，其主要是借助CSPNet提取分流的思想，同时结合残差结构的思想，设计了所谓的C3 Block，这里的CSP主分支梯度模块为BottleNeck模块，也就是所谓的残差模块。同时堆叠的个数由参数n来进行控制，也就是说不同规模的模型，n的值是有变化的。
+
+其实这里的梯度流主分支，可以是任何之前你学习过的模块，比如，美团提出的YOLOv6中就是用来重参模块RepVGGBlock来替换BottleNeck Block来作为主要的梯度流分支，而百度提出的PP-YOLOE则是使用了RepResNet-Block来替换BottleNeck Block来作为主要的梯度流分支。而YOLOv7则是使用了ELAN Block来替换BottleNeck Block来作为主要的梯度流分支。
+
+![](./imgs/c2f.png)
+
+C2f模块就是参考了C3模块以及ELAN的思想进行的设计，让YOLOv8可以在保证轻量化的同时获得更加丰富的梯度流信息。
+
+
+#### PAN-FPN改进
+
+YOLOv5的Neck部分的结构图如下：
+
+<div align="center"><img src='./imgs/v5FPN.png' weight=400px height=200px /></div>
