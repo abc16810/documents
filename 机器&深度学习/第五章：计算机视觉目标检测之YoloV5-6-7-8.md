@@ -772,4 +772,15 @@ C2f模块就是参考了C3模块以及ELAN的思想进行的设计，让YOLOv8�
 
 YOLOv5的Neck部分的结构图如下：
 
-<div align="center"><img src='./imgs/v5FPN.png' weight=400px height=200px /></div>
+<div align="center"><img src='./imgs/v5FPN.png' width=300px height=300px /></div>
+
+
+YOLOv6的Neck部分的结构图如下:
+
+<div align="center"><img src='./imgs/v6FPN.png' width=330px height=350px /></div>
+
+
+YOLOv8的结构图：
+
+
+<div align="center"><img src='./imgs/v8FPN.png' width=330px height=350px /></div>
