@@ -716,6 +716,8 @@ YOLOv8 是一个 SOTA 模型，它建立在以前 YOLO 版本的成功基础上�
 
 ![](./imgs/d238933c62901e9b4e06ac3b8cb22df4.jpg)
 
+![](./imgs/yolov8.png)
+
 YOLOv8是Ultralytics公司推出的YOLO的最新版本。作为一款尖端、最先进的（SOTA）车型，YOLOv8在之前版本的成功基础上，引入了新的功能和改进，以增强性能、灵活性和效率。YOLOv8支持全方位的视觉AI任务，包括检测、分割、姿态估计、跟踪和分类。这种多功能性允许用户在不同的应用程序和域中利用YOLOv8的功能
 
 Ultralytics为YOLO模型发布了一个全新的存储库。它被构建为 用于训练对象检测、实例分割和图像分类模型的统一框架。
@@ -728,3 +730,16 @@ Ultralytics为YOLO模型发布了一个全新的存储库。它被构建为 用�
 
 YOLOv8 还高效灵活地支持多种导出格式，并且该模型可以在 CPU 和 GPU 上运行。YOLOv8 模型的每个类别中有五个模型用于检测、分割和分类。YOLOv8 Nano 是最快和最小的，而 YOLOv8 Extra Large (YOLOv8x) 是其中最准确但最慢的
 
+
+**骨干网络**
+
+YOLOv8 CSPDarkNet骨干区别于YOLOv5 CSPDarkNet
+1. self.stem 在YOLOv8的内核大小3，而在 在YOLOv5为6
+2. 使用c2player在YOLOv8，在YOLOv5使用CSPLayer
+3. num_blocks在YOLOv8中为[3,6,6,3]，而在YOLOv5中为[3,6,9,3] 
+4. M/L/X最后阶段的通道 
+
+**neck**
+YOLOv8 使用的 YOLOv8 CSP-PAN FPN 不同于YOLOv5 CSP-PAN FPN
+- 没有横向conv
+- 使用c2player在YOLOv8而在YOLOv5中使用CSPLayer
