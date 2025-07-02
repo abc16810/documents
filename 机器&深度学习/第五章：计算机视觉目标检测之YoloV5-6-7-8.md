@@ -784,3 +784,33 @@ YOLOv8的结构图：
 
 
 <div align="center"><img src='./imgs/v8FPN.png' width=330px height=350px /></div>
+
+
+可以看到，相对于YOLOv5或者YOLOv6，YOLOv8将C3模块以及RepBlock替换为了C2f，同时细心可以发现，相对于YOLOv5和YOLOv6，YOLOv8选择将上采样之前的1×1卷积去除了，将Backbone不同阶段输出的特征直接送入了上采样操作
+
+
+#### Head部分
+
+先看一下YOLOv5本身的Head（Coupled-Head）：
+
+<div align="center"><img src='./imgs/v5head.png' width=430px height=250px /></div>
+
+
+而YOLOv8则是使用了Decoupled-Head，回归头的通道数也变成了4*reg_max的形式：
+
+<div align="center"><img src='./imgs/v8head.png' width=380px height=450px /></div>
+
+
+#### 正负样本的匹配
+
+标签分配是目标检测非常重要的一环，在YOLOv5的早期版本中使用了MaxIOU作为标签分配方法。然而，在实践中发现直接使用边长比也可以达到一样的效果。而YOLOv8则是抛弃了Anchor-Base方法使用Anchor-Free方法，找到了一个替代边长比例的匹配方法: TaskAligned。为与NMS搭配，训练样例的Anchor分配需要满足以下两个规则：
+
+
+- 正常对齐的Anchor应当可以预测高分类得分，同时具有精确定位；
+- 不对齐的Anchor应当具有低分类得分，并在NMS阶段被抑制。
+
+基于上述两个目标，TaskAligned设计了一个新的Anchor alignment metric 来在Anchor level 衡量Task-Alignment的水平。并且，Alignment metric 被集成在了 sample 分配和 loss function里来动态的优化每个 Anchor 的预测。
+
+> Anchor alignment metric：
+
+分类得分和 IoU表示了这两个任务的预测效果，所以，TaskAligned使用分类得分和IoU的高阶组合来衡量Task-Alignment的程度。使用下列的方式来对每个实例计算Anchor-level 的对齐程度： $ t=s^{\alpha}+\mu^{\beta} $  s 和 u 分别为分类得分和 IoU 值，α 和 β 为权重超参。从上边的公式可以看出来，t 可以同时控制分类得分和IoU 的优化来实现 Task-Alignment，可以引导网络动态的关注于高质量的Anchor。
