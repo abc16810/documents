@@ -813,4 +813,58 @@ YOLOv8的结构图：
 
 > Anchor alignment metric：
 
-分类得分和 IoU表示了这两个任务的预测效果，所以，TaskAligned使用分类得分和IoU的高阶组合来衡量Task-Alignment的程度。使用下列的方式来对每个实例计算Anchor-level 的对齐程度： $ t=s^{\alpha}+\mu^{\beta} $  s 和 u 分别为分类得分和 IoU 值，α 和 β 为权重超参。从上边的公式可以看出来，t 可以同时控制分类得分和IoU 的优化来实现 Task-Alignment，可以引导网络动态的关注于高质量的Anchor。
+分类得分和 IoU表示了这两个任务的预测效果，所以，TaskAligned使用分类得分和IoU的高阶组合来衡量Task-Alignment的程度。使用下列的方式来对每个实例计算Anchor-level 的对齐程度： 
+```math
+t=s^{\alpha}+\mu^{\beta}
+```
+s 和 u 分别为分类得分和 IoU 值，α 和 β 为权重超参。从上边的公式可以看出来，t 可以同时控制分类得分和IoU 的优化来实现 Task-Alignment，可以引导网络动态的关注于高质量的Anchor。
+
+> α 为0.5   β 为6
+
+> Training sample Assignment
+
+采用一种简单的分配规则选择训练样本：对每个实例，选择m个具有最大t值的Anchor作为正样本，选择其余的Anchor作为负样本。然后，通过损失函数(针对分类与定位的对齐而设计的损失函数)进行训练。
+
+
+1、计算gt和pred bbox 之间的IOU得到ious
+2、收集预测bbox的类得分（pred bboxes class score）
+3、通过公式计算对齐度量t
+4、在gt中检查正性样本中心（即anchor_points 中心坐标是否gt bbox 框内，在框内即为正样本）is_in_gts
+5、选择topk最大对齐指标（t * is_in_gts）作为每个gt的候选
+6、选择正样本（topk * is_in_gts * pad_gt_mask）
+7、如果一个锚框（anchor）被分配给多个gts，则将选择iou最高的那个
+8、分配目标 
+  样本标签（assigned_labels 负样本标签为类别数目）
+  框（assigned_bboxes）
+  得分 （assigned_scores）
+
+`assigned_scores` 是一个与分类预测输出形状相同的张量，它表示每个预测框在每个类别上的目标得分（训练标签）。对于正样本，目标得分通常设置为 1（对于真实类别）和 0（其他类别），但 YOLOv8 采用了一种更精细的方法：**使用对齐度量（alignment metric）来调整目标得分**。
+
+具体步骤：
+1. **正样本分配**：使用对齐度量（`alignment_metric`）为每个真实目标选择 top-k 个预测框作为正样本。
+2. **设置目标得分**：对于每个正样本，其目标类别的目标得分不是简单地设为 1，而是设为该预测框的 `alignment_metric` 的值（归一化到 [0,1] 范围内）。对于负样本（背景），所有类别的目标得分设为 0。
+
+```
+alignment_metrics = alignment_metrics / (
+    max_metrics_per_instance + self.eps) * max_ious_per_instance
+```
+
+#### loss
+
+在YOLOv8中，分类损失采用的是二元交叉熵损失（BCE Loss），但是与传统的BCE Loss不同，这里使用了动态生成的软标签（assigned scores）作为目标值。这种损失函数被称为Task-Aligned Classification Loss
+
+```math
+\mathcal{L}_{cls} = \frac{1}{N_{pos}} \sum_{i=1}^{N} \sum_{j=1}^{C} \text{BCE}\left( 
+\sigma(p_{ij}), \quad q_{ij}
+\right)
+```
+
+- $N$ 批量中的预测框总数
+- $C$ 类别总数
+- $\sigma(p_{ij})$ 预测框 $i$ 对类别 $j$ 的 sigmoid 输出概率
+- $q_{ij}$ Assigned Scores 矩阵中的 目标值
+- $N_{pos}$ 正样本（归一化因子）
+
+其回归损失为CIOU Loss+DFL的形式，这里Reg_max默认为16
+
+针对这里的DFL（Distribution Focal Loss），其主要是将框的位置建模成一个 general distribution，让网络快速的聚焦于和目标位置距离近的位置的分布。
