@@ -541,7 +541,7 @@ print('std {}, mean {}, \n output {}'.format(a_mean, a_std, b))
 
 这种情况下会沿着C这一维度进行展开，分别对每一个通道计算N个样本中总共N×H×W个像素点的均值和方差，数据和参数对应如下
 
-> “BatchNorm里面不是还要对标准化之后的结果做仿射变换吗，怎么使用Numpy计算的结果与BatchNorm算子一致？” 这是因为BatchNorm算子里面自动设置初始值γ=1,β=0\gamma = 1, \beta = 0γ=1,β=0，这时候仿射变换相当于是恒等变换。在训练过程中这两个参数会不断的学习，这时仿射变换就会起作用。
+> “BatchNorm里面不是还要对标准化之后的结果做仿射变换吗，怎么使用Numpy计算的结果与BatchNorm算子一致？” 这是因为BatchNorm算子里面自动设置初始值γ=1,β=0。 γ=1,β=0，这时候仿射变换相当于是恒等变换。在训练过程中这两个参数会不断的学习，这时仿射变换就会起作用。
 
 ```python
 # 输入数据形状是[N, C, H, W]时的batchnorm示例
@@ -574,6 +574,8 @@ print('std {}, mean {}, \n output: \n {}'.format(a_mean, a_std, b))
 # 与BatchNorm2D算子的结果略有差别，
 # 因为在BatchNorm2D算子为了保证数值的稳定性，
 # 在分母里面加上了一个比较小的浮点数epsilon=1e-05
+bn._mean 为移动平均值
+bn._variance 为移动方差
 ```
 
 **预测时使用BatchNorm**
