@@ -171,7 +171,7 @@ pe = torch.cat([pe_y, pe_x], dim=-1)  # (H, W, d_model)
 ```
 
 
-#### 自注意力机制(Self Attention Mechanism)
+##### 自注意力机制(Self Attention Mechanism)
 
 注意力机制，顾名思义，就是我们对某件事或某个人或物的关注重点。举个生活中的例子，当我们阅读一篇文章时，并非每个词都会被同等重视，我们会更关注那些关键的、与上下文紧密相关的词语，而非每个停顿或者辅助词。
 
@@ -217,6 +217,7 @@ a_{i,j} = \frac{q*k^T}{\sqrt{d}}
 
 - $k^T$ :k矩阵的转置
 - d：词向量长度。这里是4，论文中是512。
+> 将点积分数除以一个缩放因子（通常是键向量维度 d_k 的平方根 sqrt(d_k)）。这有助于防止点积结果过大导致 softmax 梯度过小
 
 ![](./imgs/6640.png)
 
@@ -241,10 +242,26 @@ b^0=\hat{\alpha}_{00}*v_0+\hat{\alpha}_{01}*v_1+\hat{\alpha}_{02}*v_2+\hat{\alph
 即为注意力分数矩阵 $\hat{a_{ij}}$  与 $v^j$ 矩阵的点积，也是加权和。以上就是注意力机制计算的完整过程。
 
 
-#### 多头注意力机制（Multi-Head Attention ）
+##### 多头注意力机制（Multi-Head Attention ）
 
 多头注意力机制即就是把上述的 $q^i$ 、 $k^i$ 、 $v^i$ 三个矩阵从特征维度(词向量长度)上拆分为形状相同的小矩阵，如下图所示，拆分为2个形状相同的小矩阵，即为二头注意力。本例中，句子长度为4，词向量维度是4，小矩阵维度即为[4,4/2=2]。接下来以上述方式计算2个b矩阵，再将每个Head Attention计算出来的b矩阵拼接，即为最终的注意力矩阵。
 
 注：论文中句子长度为5，词向量维度是512，将 $q^i$ 、 $k^i$ 、 $v^i$ 三个矩阵拆分成了8个形状相同的小矩阵，也就是8头注意力，小矩阵维度为[5,512/8=64]。
 
 ![](./imgs/7640.webp)
+
+##### Add & Layer normalization
+
+Add采用残差神经网络思想，也就是Multi-Head Attention的输入 $a$ 矩阵直接与输出b相加，这样可以让网络训练的更深，得到 $\bar{b}$ 矩阵，再经过Layer normalization归一化处理，加快训练速度，使得 $\bar{b}$ 的每一行也就是每个句子归一化为标准正态分布，输出为 $\hat{b}$ 。公式如下：
+
+- 均值： $μ_i = \frac{1}{s}\sum_{j=1}^s{b_{ij}}$ ，其中，s是 $\bar{b_i}$ 的长度。
+- 方差： $\sigma_i=\frac{1}{s}\sum_{j=0}^s(b_{ij}-μ_i)^2$
+- 归一化： $LayerNorm(x)=\frac{b_{ij}-μ_i}{\sqrt{\sigma_i+\epsilon}}*\gamma+\beta$
+
+![](./imgs/8640.webp)
+
+
+##### Feed Forward前馈神经网络
+
+将Add & Layer normalization输出 $\bar{b}$ ，经过两个全连接层（第一层的激活函数为 Relu，第二层不使用激活函数），再经过Add & Layer normalization得到最后输出矩阵O。
+
