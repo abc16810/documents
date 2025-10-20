@@ -47,9 +47,9 @@ PP-OCRv3检测模型是对PP-OCRv2中的CML（Collaborative Mutual Learning) 协
 
 消融实验如下：
 
-序号|	策略|	模型大小|	hmean	速度|（cpu + mkldnn)
+序号|	策略|	模型大小|	hmean	|速度（cpu + mkldnn)
 ---|---|---|---|---|
-baseline|teacher|	PP-OCR server|	49.0M|	83.20%|	171ms
+baseline teacher|	PP-OCR server|	49.0M|	83.20%|	171ms
 teacher1|	DB-R50-LK-PAN|	124.0M|	85.00%|	396ms
 teacher2|	DB-R50-LK-PAN-DML|	124.0M|	86.00%|	396ms
 baseline student|	PP-OCRv2|	3.0M|	83.20%|	117ms
