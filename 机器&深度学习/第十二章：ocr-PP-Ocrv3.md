@@ -189,3 +189,6 @@ Model|	拉丁语系|	阿拉伯语系|	日语|	韩语
 ---|---|---|---|---
 PP-OCR_mul|	69.60%|	40.50%|	38.50%|	55.40%
 PP-OCRv3_mul|	75.20%|	45.37%|	45.80%|	60.10%
+
+
+> https://www.paddleocr.ai/v2.10.0/ru/ppocr/blog/PP-OCRv3_introduction.html
