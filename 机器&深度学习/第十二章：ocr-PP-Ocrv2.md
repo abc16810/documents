@@ -652,6 +652,28 @@ Train:
     num_workers: 4
 ```
 
+shrink ratio
+
+多边形偏移：支持膨胀或收缩多边形，通过指定偏移距离（正数膨胀，负数收缩）生成新多边形路径。 
+
+连接类型：支持圆角（JT_ROUND）、直角（JT_SQUARE）等连接方式
+闭合类型：支持封闭多边形（ET_CLOSEDPOLYGON）或开放路径（ET_OPENPATH）
+
+```
+# 创建偏移对象
+offset = pyclipper.PyclipperOffset()
+
+# 添加多边形路径
+path = [(0,0),(100,0),(100,100),(0,100)]
+offset.AddPath(path, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
+
+# 执行偏移操作（膨胀21个单位）
+delta = 21
+offset_paths = offset.Execute(delta)[0]
+```
+
+![](./imgs/shrink_ratio.png)
+
 ### 文字检测优化小结
 
 PP-OCRv2中，对文字检测模型采用使用知识蒸馏方案以及数据增广策略，增加模型的泛化性能。最终文字检测模型在大小不变的情况下，Hmean从 **0.759** 提升至 **0.795**，具体消融实验如下所示。
