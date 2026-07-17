@@ -192,3 +192,58 @@ PP-OCRv3_mul|	75.20%|	45.37%|	45.80%|	60.10%
 
 
 > https://www.paddleocr.ai/v2.10.0/ru/ppocr/blog/PP-OCRv3_introduction.html
+
+### 技术点
+#### EncoderWithSVTR
+
+
+`EncoderWithSVTR` 是PaddleOCR框架中实现的一个特定网络模块，其核心作用是在文字识别（OCR）模型中作为特征提取的“颈部”（Neck）结构。它基于 SVTR（Scene Text Recognition with a Single Visual Model）算法
+
+通过SVTR进行编码 EncoderWithSVTR
+
+`EncoderWithSVTR` 的目标是将一个输入的文字图像（例如 [128, 512, 1, 40]，即 [Batch, Channel, Height, Width]）转换成一个富有上下文信息的特征序列，这个序列随后会被送入一个解码器（通常是基于CTC或Attention的解码器）来预测文本。
+
+**Patch Embedding（图像块嵌入）**
+
+这里通过骨干网络实现输出 [Batch, C, H, W]
+将二维的图像转换为一个一维的序列，并为每个图像块生成一个初始的特征向量（嵌入）
+
+- 切块与展平 [Batch, C, H, W] -> [Batch, C, H*W]
+- 线性投影 reduce dim
+    使用一个全连接层（Linear Layer）将每个展平后的图像块向量投影到一个固定的隐藏维度 D（例如 D=120）
+- 添加位置编码
+SVTR Blocks（SVTR核心模块堆叠）
+
+目的： 通过堆叠多个相同的SVTR Block，对序列中的每个Visual Token进行深层次的特征提取，并建模它们之间复杂的全局依赖关系。这是模型获得强大表征能力的关键。
+
+一个标准的 SVTR Block 通常由以下部分组成，处理输入为
+
+
+#### CTCLabelEncode
+
+CTCLabelEncode的核心目的是为模型训练准备“标准答案”（Ground Truth）。将我们易于理解的文本标签（如“hello”），转换为模型可以学习的数字索引序列
+
+1、初始化加载字符字典文件`character_dict_path`来构建字典：建立一个包含所有可能字符（如字母、数字、标点等）的字典，如果支持识别`空格`类别 即`use_space_char=true` 则在字符串列表添加`' '`。 并在字符串列表起始位置添加特色字符`blank`。生成字典（每个字符分配一个唯一的数字索引）。
+
+```
+character = ['blank', '1','2', ..., ' ']
+dict = {"blank": 0, "1": 1, "2": 2, ...}
+```
+- blank 的索引为0 即为后边填充0 做占位符
+
+2、判断label的最大长度（max_text_len 默认25）。label字符的长度大于该值或者为0 则忽略
+3、编码文本：将标签中的每个字符，逐一替换成其在字典中对应的数字索引 如 `text_index = [44, 47, 43, 63, 62, 67]`
+4、将所有编码后的序列用0填充（Padding）到最大长度（max_text_len）  `text_index = [44, 47, 43, 63, 62, 67,0,0,0,0, ...]`
+
+
+#### CTCLabelDecode
+
+后处理 (CTCLabelDecode)：将模型输出的特征序列解码成最终的文本字符串
+
+1、同`CTCLabelEncode`
+
+
+#### sar （Sequence-Aware Representation）head
+
+https://aistudio.baidu.com/projectdetail/3734933?channelType=0&channel=0
+https://arxiv.org/pdf/1811.00751
