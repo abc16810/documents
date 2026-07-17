@@ -212,11 +212,138 @@ PP-OCRv3_mul|	75.20%|	45.37%|	45.80%|	60.10%
 - 线性投影 reduce dim
     使用一个全连接层（Linear Layer）将每个展平后的图像块向量投影到一个固定的隐藏维度 D（例如 D=120）
 - 添加位置编码
-SVTR Blocks（SVTR核心模块堆叠）
+
+
+**SVTR Blocks（SVTR核心模块堆叠）**
 
 目的： 通过堆叠多个相同的SVTR Block，对序列中的每个Visual Token进行深层次的特征提取，并建模它们之间复杂的全局依赖关系。这是模型获得强大表征能力的关键。
 
 一个标准的 SVTR Block 通常由以下部分组成，处理输入为
+
+- **LayerNorm1**： 对输入 $Z_{i-1}$  进行层归一化。
+
+- **多头自注意力**：MSA允许序列中的每一个Token（图像块）与序列中的所有其他Token进行交互，从而捕获全局上下文信息。这对于识别形状怪异、有遮挡或有复杂背景的文本至关重要。输出与输入同维度的特征。
+
+- **残差连接 1**： $Z‘_i = MSA(LN(Z_{i-1})) + Z_{i-1}$ 。这有助于缓解梯度消失问题。
+
+- **LayerNorm 2**： 对 $Z‘_i$ 进行层归一化。
+
+- **前馈网络：**
+    - 通常是一个两层的MLP，带有激活函数（如GELU）和Dropout。
+    - 它对每个Token的特征进行非线性变换和增强。
+
+- **残差连接 2**： $Z_i = FFN(LN(Z‘_i)) + Z‘_i$ 。
+
+- **重复堆叠**：这个过程会重复 N 次（例如 N=2）。最终输出为 Z_N，形状仍然是 [B, L, D]（[128, 40, 120]）。
+
+**Sequence Aggregation（序列聚合）**
+
+last stage
+- **重塑：** 将序列 `$Z_N$` 的形状从 [B, L, D] 重塑回与2D空间对应的形状 [B, D, H', W']。其中 在我们的例子中，就是 [128, 120, 1, 40]。
+
+- **宽度方向的挤压**：
+    - 使用一个 卷积层 或 AdaptiveAvgPool2d 在宽度方向上进行压缩。
+    - 例如： 使用一个核大小为 (1, 2)，步长为 (1, 2) 的卷积，或者一个目标大小为 (H', 1) 的自适应平均池化。
+    - 这个操作将特征图的宽度 W' 大幅减小。
+
+    而且paddleocr v3也没有使用论文里面的AdaptiveAvgPool2D，而是使用卷积的方式，很好的解决了out_char_num问题。
+
+**Linear Projection（线性投影）**
+
+通过conv1x1实现
+
+
+**（可选）混合架构**
+原始的SVTR论文还提出了一种“混合架构”，在堆叠SVTR Blocks之前，先使用几层轻量级的CNN（如MobileNet块）来提取局部特征。这可以看作是一个“CNN前端 + Transformer后端”的结构，结合了CNN的局部性优势和Transformer的全局性优势。EncoderWithSVTR 有时也指代这种混合架构。
+
+
+SVTR 编码过程
+
+```
+    # z -> [B,512,1,40]
+    # reduce dim
+    z = self.conv1(z) #  Conv2D(512, 64, kernel_size=[3, 3], padding=[1, 1]
+    z = self.conv2(z) #  Conv2D(64, 120, kernel_size=[1, 1]
+    # z -> [B,120,1,40]
+    
+    # SVTR global block
+    z = z.flatten(2).transpose([0, 2, 1]) # z -> [B,40,120]
+    # 再经过depth=2层svtr_block
+    
+    x = self.norm1(z)
+    x = self.mixer(x)
+    
+    # self.mixer (多头注意力模块)
+        qkv = (
+            self.qkv(x)  # Linear(in_features=120, out_features=360, dtype=float32)
+            .reshape((0, -1, 3, self.num_heads, self.head_dim)) #  num_heads=8, head_dim= 120(hidden_dims)//8 = 15
+            .transpose((2, 0, 3, 1, 4))
+        )  # -> [3,B,num_heads,40,head_dim]
+        
+        # 获取q,k,v  self.scale = self.head_dim**-0.5
+        q, k, v = qkv[0] * self.scale, qkv[1], qkv[2] 
+        
+        # attn
+        attn = q.matmul(k.transpose((0, 1, 3, 2)))
+        attn = nn.functional.softmax(attn, axis=-1)
+        attn = self.attn_drop(attn)  # 0.1
+        # [B,num_heads,40,head_dim] -> [B,40,num_heads,head_dim] -> [B,40,hidden_dims]
+        x = (attn.matmul(v)).transpose((0, 2, 1, 3)).reshape((0, -1, self.dim))
+        x = self.proj(x) # Linear(in_features=120, out_features=120, dtype=float32)
+        x = self.proj_drop(x)  # 0.1 drop_rate
+    
+    z = z + self.drop_path(x)  # Identity
+    
+    x = self.norm2(z)
+    x = self.mlp(x)  # 前馈网络（多层感知机）
+        FFN = Dropout(FC2(Dropout(Activation(FC1(x)))))  # swish 0.1
+        
+    out = z + Identity(x)  # [B,40,120]
+
+    z = self.norm(out)
+    
+    # last stage
+    z = z.reshape([0, H, W, C]).transpose([0, 3, 1, 2]) # [B,120,1,40]
+    z = self.conv3(z)   # [B,512,1,40]
+    z = paddle.concat((h, z), axis=1) # [B,1024,1,40]
+    z = self.conv1x1(self.conv4(z)) # [B,64,1,40]
+```
+
+#### Im2Seq
+
+Im2Seq 是一个连接CNN骨干网络和CTC解码器的桥梁模块，主要作用是将2D特征图 [B, C, H, W] 转换为1D特征序列 [B, T, C']，其中 T 是序列长度，通常对应文本的最大识别长度
+
+```
+# x  [B,64,1,40] B, C, H, W
+x = x.squeeze(axis=2)
+x = x.transpose([0, 2, 1])  # (NTC)(batch, width, channels)
+```
+
+#### CTCHead
+
+核心思想
+- 输入：特征序列 [T, B, C] 或 [B, T, C]
+- 输出：每个时间步的字符概率分布
+- 目标：处理序列标注问题，无需精确的序列对齐
+  
+通过一个全连接预测输出（字符个数）
+
+```
+# out_features 为所有字符串的长度
+Linear(in_features=64, out_features=97, dtype=float32)
+
+# 预测模式
+if not self.training:
+    predicts = F.softmax(predicts, axis=2)
+    result = predicts
+```
+
+CTC的优点是速度极快，因为每一帧的预测是并行的，没有复杂的依赖关系，所以推理速度非常快。但也具有明显的缺点：
+
+- 条件独立假设： 它假设每一帧的预测是相互独立的，这导致它很难学习到字符之间的长程上下文关系
+- 对齐不精确： 因为没有显式的对齐机制，有时会出现对齐错误，导致识别精度，尤其是对于不规则、弯曲文本的识别精度不高。
+
+所以我们引入attention机制，在解码生成每一个字符时，Attention 模型都会“回头看”一遍完整的输入特征序列，并给每一帧分配一个“注意力权重”，然后加权求和，最后再预测当前字符。它打破了条件独立假设，能显式地学习输入与输出之间的依赖关系，上下文建模能力强，对不规则文本识别效果好。
 
 
 #### CTCLabelEncode
@@ -231,8 +358,10 @@ dict = {"blank": 0, "1": 1, "2": 2, ...}
 ```
 - blank 的索引为0 即为后边填充0 做占位符
 
-2、判断label的最大长度（max_text_len 默认25）。label字符的长度大于该值或者为0 则忽略
+2、判断label的最大长度（max_text_len 默认25）。label字符的长度大于该值或者为0 则忽略。
+
 3、编码文本：将标签中的每个字符，逐一替换成其在字典中对应的数字索引 如 `text_index = [44, 47, 43, 63, 62, 67]`
+
 4、将所有编码后的序列用0填充（Padding）到最大长度（max_text_len）  `text_index = [44, 47, 43, 63, 62, 67,0,0,0,0, ...]`
 
 

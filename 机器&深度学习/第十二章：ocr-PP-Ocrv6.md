@@ -61,3 +61,34 @@ https://www.paddleocr.ai/latest/version3.x/algorithm/PP-OCRv6/PP-OCRv6.html
 
 ##### EncoderWithLightSVTR
 
+- **局部上下文建模 (Local Context Modeling)**：使用 1×7 的深度可分离卷积 (Depthwise Conv) 来捕捉文字中相邻笔画或字符的局部细节
+
+- **全局自注意力 (Global Self-Attention)**：通过 1-2 层 Transformer 层来捕捉整个文本行中长距离的依赖关系，理解单词的整体语境
+
+- **加法跳跃连接 (Additive Skip Connections)**：与PP-OCRv5中使用的拼接（Concat）方式不同，v6版本采用了加法来融合不同层的特征。这种设计能在不牺牲性能的前提下，有效减少模型参数
+
+    ```
+    skip = self.skip_conv(x)  # 1*1  dims=192
+    ...
+    z = z + skip
+    return z
+    ```
+
+
+```
+if self.use_guide: # 是否冻结主干网络梯度
+    x = x.clone()
+    x.stop_gradient = True
+
+skip = self.skip_conv(x)
+z = self.conv_reduce(x)  # 减少维度到dims
+z = z + self.local_conv(z)  # 局部上下文建模
+B, C, H, W = z.shape
+z = z.flatten(2).transpose([0, 2, 1]) # [batch, C,H,W] -> [batch,C,H*W] -> [batch,H*W,C]
+for blk in self.svtr_block:  # block 层数为depth=2
+    z = blk(z)
+z = self.norm(z)
+z = z.reshape([0, H, W, C]).transpose([0, 3, 1, 2])
+z = z + skip   # 加法跳跃连接
+return z
+```
