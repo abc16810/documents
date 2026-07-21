@@ -330,7 +330,7 @@ x = x.transpose([0, 2, 1])  # (NTC)(batch, width, channels)
 
 ```
 # out_features 为所有字符串的长度
-Linear(in_features=64, out_features=97, dtype=float32)
+Linear(in_features=64, out_features=97, dtype=float32) -> [B, 40, out_features]
 
 # 预测模式
 if not self.training:
@@ -370,6 +370,11 @@ dict = {"blank": 0, "1": 1, "2": 2, ...}
 后处理 (CTCLabelDecode)：将模型输出的特征序列解码成最终的文本字符串
 
 1、同`CTCLabelEncode`
+
+
+
+#### CTCLoss
+
 
 
 #### sar （Sequence-Aware Representation）head
