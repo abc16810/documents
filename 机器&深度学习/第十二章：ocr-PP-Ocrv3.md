@@ -367,10 +367,18 @@ dict = {"blank": 0, "1": 1, "2": 2, ...}
 
 #### CTCLabelDecode
 
-后处理 (CTCLabelDecode)：将模型输出的特征序列解码成最终的文本字符串
+后处理 (CTCLabelDecode)：将模型输出的特征序列解码【batch, leg, label_legth】成最终的文本字符串
 
-1、同`CTCLabelEncode`
+1、同`CTCLabelEncode` 生成字典
+2、去除空白占位符：模型输出中有一个特殊的“空白（blank）”标记，用于分隔字符。解码时，第一步就是移除这些占位符 即0
+3、合并重复字符：当一个字符连续出现时，模型可能会输出多个相同的字符。解码时会将连续的重复字符合并为一个 
 
+```
+if is_remove_duplicate:
+    selection[1:] = text_index[batch_idx][1:] != text_index[batch_idx][:-1]
+for ignored_token in ignored_tokens:
+    selection &= text_index[batch_idx] != ignored_token
+```
 
 
 #### CTCLoss
